@@ -30,69 +30,7 @@ class Track:
     bpm: int
     genre: str
     year: int
-
-
-DEFAULT_TRACKS = [
-    Track(
-        id="trk_001",
-        title="Morning Rally",
-        artist="Squash Ensemble",
-        album="Rise Up",
-        cover="/static/images/cover-rise-up.svg",
-        duration="3:42",
-        bpm=128,
-        genre="House",
-        year=2021,
-    ),
-    Track(
-        id="trk_002",
-        title="Glass Court",
-        artist="Neon Strings",
-        album="City Lights",
-        cover="/static/images/cover-city-lights.svg",
-        duration="4:07",
-        bpm=115,
-        genre="Synthwave",
-        year=2020,
-    ),
-    Track(
-        id="trk_003",
-        title="Final Serve",
-        artist="Daylight Signals",
-        album="Match Point",
-        cover="/static/images/cover-match-point.svg",
-        duration="2:58",
-        bpm=140,
-        genre="Pop",
-        year=2022,
-    ),
-    Track(
-        id="trk_004",
-        title="Quiet Bounce",
-        artist="Afterimage",
-        album="Night Practice",
-        cover="/static/images/cover-night-practice.svg",
-        duration="5:12",
-        bpm=98,
-        genre="Ambient",
-        year=2019,
-    ),
-]
-
-DEFAULT_PLAYLISTS = [
-    {
-        "id": "pl_001",
-        "name": "朝のルーティン",
-        "track_ids": ["trk_001", "trk_003"],
-    },
-    {
-        "id": "pl_002",
-        "name": "クールダウン",
-        "track_ids": ["trk_004"],
-    },
-]
-
-DEFAULT_FAVORITES = ["trk_002", "trk_003"]
+    file_url: str | None = None
 
 
 def _ensure_data_dirs() -> None:
@@ -140,15 +78,9 @@ def _init_library() -> None:
     if LIBRARY_PATH.exists():
         return
     data = {
-        "tracks": [
-            {
-                **asdict(track),
-                "file_path": None,
-            }
-            for track in DEFAULT_TRACKS
-        ],
-        "playlists": DEFAULT_PLAYLISTS,
-        "favorites": DEFAULT_FAVORITES,
+        "tracks": [],
+        "playlists": [],
+        "favorites": [],
     }
     LIBRARY_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -168,20 +100,25 @@ def _save_library(data: dict) -> None:
 def _fetch_tracks() -> list[Track]:
     data = _load_library()
     rows = data.get("tracks", [])
-    return [
-        Track(
-            id=row["id"],
-            title=row["title"],
-            artist=row["artist"],
-            album=row["album"],
-            cover=row["cover"],
-            duration=row["duration"],
-            bpm=row["bpm"],
-            genre=row["genre"],
-            year=row["year"],
+    tracks = []
+    for row in rows:
+        file_path = row.get("file_path")
+        file_url = f"/media/{Path(file_path).name}" if file_path else None
+        tracks.append(
+            Track(
+                id=row["id"],
+                title=row["title"],
+                artist=row["artist"],
+                album=row["album"],
+                cover=row["cover"],
+                duration=row["duration"],
+                bpm=row["bpm"],
+                genre=row["genre"],
+                year=row["year"],
+                file_url=file_url,
+            )
         )
-        for row in rows
-    ]
+    return tracks
 
 
 def _fetch_playlists() -> list[dict]:
@@ -192,19 +129,6 @@ def _fetch_playlists() -> list[dict]:
 def _fetch_favorites() -> list[str]:
     data = _load_library()
     return data.get("favorites", [])
-
-
-def _ensure_playlist(data: dict, playlist_id: str | None, playlist_name: str | None) -> str | None:
-    playlists = data.setdefault("playlists", [])
-    if playlist_id:
-        for playlist in playlists:
-            if playlist["id"] == playlist_id:
-                return playlist_id
-    if playlist_name:
-        playlist_id = playlist_id or f"pl_{uuid.uuid4().hex[:8]}"
-        playlists.append({"id": playlist_id, "name": playlist_name, "track_ids": []})
-        return playlist_id
-    return None
 
 
 def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
@@ -246,32 +170,19 @@ def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
     return infos, log_output
 
 
-def _store_downloaded_tracks(
-    infos: list[dict],
-    playlist_id: str | None,
-    playlist_name: str | None,
-) -> list[Track]:
+def _store_downloaded_tracks(infos: list[dict]) -> list[Track]:
     stored_tracks: list[Track] = []
     data = _load_library()
-    ensured_playlist_id = _ensure_playlist(data, playlist_id, playlist_name)
     tracks = data.setdefault("tracks", [])
     track_map = {track["id"]: track for track in tracks}
-    playlist_lookup = {
-        playlist["id"]: playlist for playlist in data.get("playlists", [])
-    }
     for info in infos:
         track = _parse_track_from_info(info)
         file_path = MEDIA_DIR / f"{info.get('id', track.id)}.mp3"
+        track.file_url = f"/media/{file_path.name}"
         if track.id not in track_map:
             track_entry = {**asdict(track), "file_path": str(file_path)}
             tracks.append(track_entry)
             track_map[track.id] = track_entry
-        if ensured_playlist_id:
-            playlist = playlist_lookup.get(ensured_playlist_id)
-            if playlist is not None:
-                playlist.setdefault("track_ids", [])
-                if track.id not in playlist["track_ids"]:
-                    playlist["track_ids"].append(track.id)
         stored_tracks.append(track)
     _save_library(data)
     return stored_tracks
@@ -282,11 +193,7 @@ def _ingest_from_url(payload: dict) -> tuple[list[Track], str]:
     if not url:
         raise ValueError("url is required")
     infos, log_output = _download_with_ytdlp(url)
-    tracks = _store_downloaded_tracks(
-        infos,
-        payload.get("playlist_id"),
-        payload.get("playlist_name"),
-    )
+    tracks = _store_downloaded_tracks(infos)
     return tracks, log_output
 
 
@@ -354,6 +261,10 @@ class SquashTermHandler(BaseHTTPRequestHandler):
         if self.path.startswith("/static/"):
             static_path = STATIC_DIR / self.path.replace("/static/", "", 1)
             self._send_file(static_path)
+            return
+        if self.path.startswith("/media/"):
+            media_path = MEDIA_DIR / self.path.replace("/media/", "", 1)
+            self._send_file(media_path)
             return
 
         self.send_error(HTTPStatus.NOT_FOUND, "Not Found")

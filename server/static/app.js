@@ -8,7 +8,6 @@ const favorites = document.getElementById("favorites");
 const tagSelect = document.getElementById("tag-track-select");
 const importForm = document.getElementById("import-form");
 const importUrl = document.getElementById("import-url");
-const importPlaylist = document.getElementById("import-playlist");
 const importAutoTag = document.getElementById("import-auto-tag");
 const importSubmit = document.getElementById("import-submit");
 const importLog = document.getElementById("import-log");
@@ -17,10 +16,38 @@ const statusVersion = document.getElementById("status-version");
 const statusDevice = document.getElementById("status-device");
 const statusTime = document.getElementById("status-time");
 
+const audioPlayer = document.getElementById("audio-player");
+const playerOverlay = document.getElementById("player-overlay");
+const playerClose = document.getElementById("player-close");
+const playerCover = document.getElementById("player-cover");
+const playerTitle = document.getElementById("player-title");
+const playerArtist = document.getElementById("player-artist");
+const playerAlbum = document.getElementById("player-album");
+const playerToggle = document.getElementById("player-toggle");
+const playerPrev = document.getElementById("player-prev");
+const playerNext = document.getElementById("player-next");
+const playerSeek = document.getElementById("player-seek");
+const playerCurrent = document.getElementById("player-current");
+const playerDuration = document.getElementById("player-duration");
+
+const miniPlayer = document.getElementById("mini-player");
+const miniCover = document.getElementById("mini-cover");
+const miniTitle = document.getElementById("mini-title");
+const miniArtist = document.getElementById("mini-artist");
+const miniToggle = document.getElementById("mini-toggle");
+const miniPrev = document.getElementById("mini-prev");
+const miniNext = document.getElementById("mini-next");
+const miniExpand = document.getElementById("mini-expand");
+
 const state = {
   tracks: [],
   playlists: [],
   favorites: [],
+};
+
+const playerState = {
+  currentIndex: -1,
+  isPlaying: false,
 };
 
 tabs.forEach((tab) => {
@@ -36,17 +63,149 @@ tabs.forEach((tab) => {
 });
 
 const renderNowPlaying = (track) => {
-  const title = track ? track.title : "--";
+  const title = track ? track.title : "空です。";
   const meta = track ? `${track.artist} ・ ${track.album}` : "--";
   nowPlaying.querySelector(".track").textContent = title;
   nowPlaying.querySelector(".meta").textContent = meta;
 };
 
+const formatTime = (seconds) => {
+  if (!Number.isFinite(seconds)) {
+    return "0:00";
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.floor(seconds % 60);
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+};
+
+const updatePlayerButtons = () => {
+  const label = playerState.isPlaying ? "一時停止" : "再生";
+  if (playerToggle) {
+    playerToggle.textContent = label;
+  }
+  if (miniToggle) {
+    miniToggle.textContent = label;
+  }
+};
+
+const updatePlayerUI = () => {
+  if (playerState.currentIndex >= state.tracks.length) {
+    playerState.currentIndex = -1;
+  }
+  const track = state.tracks[playerState.currentIndex];
+  if (!track) {
+    renderNowPlaying(null);
+    if (miniPlayer) {
+      miniPlayer.classList.remove("is-active");
+      miniPlayer.setAttribute("aria-hidden", "true");
+    }
+    return;
+  }
+  renderNowPlaying(track);
+  if (playerCover) {
+    playerCover.src = track.cover || "";
+    playerCover.alt = track.album || track.title;
+  }
+  if (playerTitle) {
+    playerTitle.textContent = track.title;
+  }
+  if (playerArtist) {
+    playerArtist.textContent = track.artist;
+  }
+  if (playerAlbum) {
+    playerAlbum.textContent = track.album;
+  }
+  if (miniCover) {
+    miniCover.src = track.cover || "";
+    miniCover.alt = track.album || track.title;
+  }
+  if (miniTitle) {
+    miniTitle.textContent = track.title;
+  }
+  if (miniArtist) {
+    miniArtist.textContent = track.artist;
+  }
+  if (miniPlayer) {
+    miniPlayer.classList.add("is-active");
+    miniPlayer.setAttribute("aria-hidden", "false");
+  }
+  updatePlayerButtons();
+};
+
+const openPlayerOverlay = () => {
+  if (playerOverlay) {
+    playerOverlay.classList.add("is-active");
+    playerOverlay.setAttribute("aria-hidden", "false");
+  }
+};
+
+const setTrackByIndex = (index) => {
+  const track = state.tracks[index];
+  if (!track) {
+    return;
+  }
+  if (!track.file_url) {
+    appendImportLog("音源が見つかりません。");
+    return;
+  }
+  playerState.currentIndex = index;
+  if (audioPlayer) {
+    audioPlayer.src = track.file_url;
+  }
+  updatePlayerUI();
+};
+
+const togglePlayback = async () => {
+  if (!audioPlayer) {
+    return;
+  }
+  if (playerState.currentIndex === -1) {
+    if (state.tracks.length > 0) {
+      setTrackByIndex(0);
+    } else {
+      return;
+    }
+  }
+  if (audioPlayer.paused) {
+    await audioPlayer.play();
+  } else {
+    audioPlayer.pause();
+  }
+};
+
+const playNext = () => {
+  if (!state.tracks.length) {
+    return;
+  }
+  const nextIndex = (playerState.currentIndex + 1) % state.tracks.length;
+  setTrackByIndex(nextIndex);
+  if (audioPlayer) {
+    audioPlayer.play();
+  }
+};
+
+const playPrev = () => {
+  if (!state.tracks.length) {
+    return;
+  }
+  const prevIndex =
+    (playerState.currentIndex - 1 + state.tracks.length) % state.tracks.length;
+  setTrackByIndex(prevIndex);
+  if (audioPlayer) {
+    audioPlayer.play();
+  }
+};
+
 const renderMedia = () => {
   mediaGrid.innerHTML = "";
+  if (state.tracks.length === 0) {
+    mediaGrid.innerHTML = '<div class="empty-state">空です。</div>';
+    return;
+  }
   state.tracks.forEach((track) => {
     const card = document.createElement("div");
     card.className = "media-card";
+    const hasAudio = Boolean(track.file_url);
     card.innerHTML = `
       <img src="${track.cover}" alt="${track.album}" />
       <h3>${track.title}</h3>
@@ -56,10 +215,16 @@ const renderMedia = () => {
         <span>${track.genre} ・ ${track.year}</span>
         <span>${track.duration}</span>
       </div>
-      <button class="play-button" type="button">再生</button>
+      <button class="play-button ${hasAudio ? "" : "is-disabled"}" type="button" ${
+  hasAudio ? "" : "disabled"
+}>${hasAudio ? "再生" : "音源なし"}</button>
     `;
     card.querySelector("button").addEventListener("click", () => {
-      renderNowPlaying(track);
+      const index = state.tracks.findIndex((item) => item.id === track.id);
+      if (index >= 0) {
+        setTrackByIndex(index);
+        togglePlayback();
+      }
     });
     mediaGrid.appendChild(card);
   });
@@ -67,6 +232,10 @@ const renderMedia = () => {
 
 const renderPlaylists = () => {
   playlistList.innerHTML = "";
+  if (state.playlists.length === 0) {
+    playlistList.innerHTML = '<div class="empty-state">空です。</div>';
+    return;
+  }
   state.playlists.forEach((playlist) => {
     const trackNames = playlist.track_ids
       .map((id) => state.tracks.find((track) => track.id === id))
@@ -92,34 +261,45 @@ const renderFavorites = () => {
     <h3>お気に入り</h3>
     <p>よく聴く楽曲のショートカット。</p>
   `;
-  const list = document.createElement("ul");
-  state.favorites
+  const favoriteTracks = state.favorites
     .map((id) => state.tracks.find((track) => track.id === id))
-    .filter(Boolean)
-    .forEach((track) => {
-      const item = document.createElement("li");
-      item.textContent = `${track.title} / ${track.artist}`;
-      list.appendChild(item);
+    .filter(Boolean);
+  if (favoriteTracks.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "空です。";
+    favorites.appendChild(empty);
+    return;
+  }
+  const list = document.createElement("ul");
+  favoriteTracks.forEach((track) => {
+    const item = document.createElement("li");
+    item.textContent = `${track.title} / ${track.artist}`;
+    item.addEventListener("click", () => {
+      const index = state.tracks.findIndex((itemTrack) => itemTrack.id === track.id);
+      if (index >= 0) {
+        setTrackByIndex(index);
+        togglePlayback();
+      }
     });
+    list.appendChild(item);
+  });
   favorites.appendChild(list);
 };
 
 const renderTagOptions = () => {
-  tagSelect.innerHTML = state.tracks
-    .map((track) => `<option value="${track.id}">${track.title} / ${track.artist}</option>`)
-    .join("");
-};
-
-const renderImportPlaylists = () => {
-  if (!importPlaylist) {
+  if (!tagSelect) {
     return;
   }
-  const options = state.playlists.map(
-    (playlist) =>
-      `<option value="${playlist.id}">${playlist.name}</option>`
-  );
-  options.push('<option value="__new__">未分類</option>');
-  importPlaylist.innerHTML = options.join("");
+  if (state.tracks.length === 0) {
+    tagSelect.innerHTML = '<option value="">空です。</option>';
+    return;
+  }
+  tagSelect.innerHTML = state.tracks
+    .map(
+      (track) => `<option value="${track.id}">${track.title} / ${track.artist}</option>`
+    )
+    .join("");
 };
 
 const fetchJson = async (path) => {
@@ -156,7 +336,7 @@ const refreshLibrary = async () => {
   renderPlaylists();
   renderFavorites();
   renderTagOptions();
-  renderImportPlaylists();
+  updatePlayerUI();
 };
 
 const appendImportLog = (message) => {
@@ -172,15 +352,9 @@ const handleImportSubmit = async () => {
     appendImportLog("URL を入力してください。");
     return;
   }
-  const selected = importPlaylist?.value;
   const payload = {
     url,
   };
-  if (selected && selected !== "__new__") {
-    payload.playlist_id = selected;
-  } else if (selected === "__new__") {
-    payload.playlist_name = "未分類";
-  }
   payload.auto_tag = Boolean(importAutoTag?.checked);
   appendImportLog("yt-dlp を実行中...");
   try {
@@ -210,8 +384,12 @@ const init = async () => {
     renderPlaylists();
     renderFavorites();
     renderTagOptions();
-    renderImportPlaylists();
-    renderNowPlaying(tracks[0]);
+    updatePlayerUI();
+    if (tracks.length === 0) {
+      renderNowPlaying(null);
+    } else {
+      renderNowPlaying(tracks[0]);
+    }
 
     statusVersion.textContent = status.version;
     statusDevice.textContent = status.device;
@@ -231,6 +409,104 @@ if (importForm) {
   importForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleImportSubmit();
+  });
+}
+
+if (audioPlayer) {
+  audioPlayer.addEventListener("play", () => {
+    playerState.isPlaying = true;
+    updatePlayerButtons();
+  });
+
+  audioPlayer.addEventListener("pause", () => {
+    playerState.isPlaying = false;
+    updatePlayerButtons();
+  });
+
+  audioPlayer.addEventListener("timeupdate", () => {
+    if (!playerSeek) {
+      return;
+    }
+    const { currentTime, duration } = audioPlayer;
+    playerSeek.value = duration ? Math.floor((currentTime / duration) * 100) : 0;
+    if (playerCurrent) {
+      playerCurrent.textContent = formatTime(currentTime);
+    }
+    if (playerDuration) {
+      playerDuration.textContent = formatTime(duration);
+    }
+  });
+
+  audioPlayer.addEventListener("ended", () => {
+    playNext();
+  });
+}
+
+if (playerSeek && audioPlayer) {
+  playerSeek.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    if (Number.isFinite(value) && audioPlayer.duration) {
+      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
+    }
+  });
+}
+
+if (playerToggle) {
+  playerToggle.addEventListener("click", () => {
+    togglePlayback();
+  });
+}
+
+if (miniToggle) {
+  miniToggle.addEventListener("click", () => {
+    togglePlayback();
+  });
+}
+
+if (playerPrev) {
+  playerPrev.addEventListener("click", () => {
+    playPrev();
+  });
+}
+
+if (playerNext) {
+  playerNext.addEventListener("click", () => {
+    playNext();
+  });
+}
+
+if (miniPrev) {
+  miniPrev.addEventListener("click", () => {
+    playPrev();
+  });
+}
+
+if (miniNext) {
+  miniNext.addEventListener("click", () => {
+    playNext();
+  });
+}
+
+if (miniExpand) {
+  miniExpand.addEventListener("click", () => {
+    openPlayerOverlay();
+  });
+}
+
+if (playerClose) {
+  playerClose.addEventListener("click", () => {
+    if (playerOverlay) {
+      playerOverlay.classList.remove("is-active");
+      playerOverlay.setAttribute("aria-hidden", "true");
+    }
+  });
+}
+
+if (nowPlaying) {
+  nowPlaying.addEventListener("click", () => {
+    if (playerState.currentIndex >= 0) {
+      openPlayerOverlay();
+    }
   });
 }
 
