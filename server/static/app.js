@@ -53,8 +53,6 @@ const playerState = {
 
 const seekState = {
   isScrubbing: false,
-  lastPercent: 0,
-  activeSeek: null,
   pendingPercent: null,
 };
 
@@ -88,40 +86,13 @@ const formatTime = (seconds) => {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-const getSeekParts = (element) => {
-  if (!element) {
-    return {};
-  }
-  return {
-    fill: element.querySelector(".seek-fill"),
-    thumb: element.querySelector(".seek-thumb"),
-  };
-};
-
 const setSeekPercent = (percent) => {
   const clamped = clamp(percent, 0, 100);
-  seekState.lastPercent = clamped;
   if (playerSeek) {
-    const { fill, thumb } = getSeekParts(playerSeek);
-    if (fill) {
-      fill.style.width = `${clamped}%`;
-    }
-    if (thumb) {
-      thumb.style.left = `${clamped}%`;
-    }
-    playerSeek.dataset.value = clamped.toString();
-    playerSeek.setAttribute("aria-valuenow", clamped.toFixed(0));
+    playerSeek.value = clamped;
   }
   if (miniSeek) {
-    const { fill, thumb } = getSeekParts(miniSeek);
-    if (fill) {
-      fill.style.width = `${clamped}%`;
-    }
-    if (thumb) {
-      thumb.style.left = `${clamped}%`;
-    }
-    miniSeek.dataset.value = clamped.toString();
-    miniSeek.setAttribute("aria-valuenow", clamped.toFixed(0));
+    miniSeek.value = clamped;
   }
 };
 
@@ -158,92 +129,6 @@ const commitSeekPercent = (percent) => {
     playerCurrent.textContent = formatTime(targetTime);
   }
   seekState.pendingPercent = null;
-};
-
-const getSeekPercentFromEvent = (event, element) => {
-  const rect = element.getBoundingClientRect();
-  if (!Number.isFinite(rect.width) || rect.width <= 0) {
-    return seekState.lastPercent;
-  }
-  if (!Number.isFinite(event.clientX)) {
-    return seekState.lastPercent;
-  }
-  const x = event.clientX - rect.left;
-  return clamp((x / rect.width) * 100, 0, 100);
-};
-
-const handleSeekPointerDown = (event, element) => {
-  if (event.button !== 0) {
-    return;
-  }
-  event.preventDefault();
-  seekState.isScrubbing = true;
-  seekState.activeSeek = element;
-  if (element.setPointerCapture) {
-    element.setPointerCapture(event.pointerId);
-  }
-  const percent = getSeekPercentFromEvent(event, element);
-  setSeekPercent(percent);
-  seekState.pendingPercent = percent;
-};
-
-const handleSeekPointerMove = (event, element) => {
-  if (!seekState.isScrubbing || seekState.activeSeek !== element) {
-    return;
-  }
-  const percent = getSeekPercentFromEvent(event, element);
-  setSeekPercent(percent);
-  seekState.pendingPercent = percent;
-};
-
-const handleSeekPointerEnd = (event, element) => {
-  if (seekState.activeSeek !== element) {
-    return;
-  }
-  if (element.releasePointerCapture) {
-    element.releasePointerCapture(event.pointerId);
-  }
-  if (event.type !== "pointercancel") {
-    const percent = getSeekPercentFromEvent(event, element);
-    setSeekPercent(percent);
-  }
-  commitSeekPercent(seekState.lastPercent);
-  seekState.isScrubbing = false;
-  seekState.activeSeek = null;
-};
-
-const getSeekPercentFromElement = (element) => {
-  if (!element) {
-    return 0;
-  }
-  const value = Number(element.dataset.value ?? element.getAttribute("aria-valuenow"));
-  return Number.isFinite(value) ? value : 0;
-};
-
-const handleSeekKeydown = (event, element) => {
-  const step = event.shiftKey ? 10 : 5;
-  let percent = getSeekPercentFromElement(element);
-  switch (event.key) {
-    case "ArrowLeft":
-    case "ArrowDown":
-      percent -= step;
-      break;
-    case "ArrowRight":
-    case "ArrowUp":
-      percent += step;
-      break;
-    case "Home":
-      percent = 0;
-      break;
-    case "End":
-      percent = 100;
-      break;
-    default:
-      return;
-  }
-  event.preventDefault();
-  setSeekPercent(percent);
-  commitSeekPercent(percent);
 };
 
 const updatePlayerButtons = () => {
@@ -630,39 +515,48 @@ if (audioPlayer) {
   });
 }
 
+const handleSeekInput = (event) => {
+  const value = event.target.valueAsNumber;
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  seekState.isScrubbing = true;
+  seekState.pendingPercent = value;
+  setSeekPercent(value);
+};
+
+const handleSeekCommit = (event) => {
+  const value = event.target.valueAsNumber;
+  if (!Number.isFinite(value)) {
+    seekState.isScrubbing = false;
+    return;
+  }
+  setSeekPercent(value);
+  commitSeekPercent(value);
+  seekState.isScrubbing = false;
+};
+
 if (playerSeek && audioPlayer) {
-  playerSeek.addEventListener("pointerdown", (event) => {
-    handleSeekPointerDown(event, playerSeek);
+  playerSeek.addEventListener("input", handleSeekInput);
+  playerSeek.addEventListener("change", handleSeekCommit);
+  playerSeek.addEventListener("pointerdown", () => {
+    seekState.isScrubbing = true;
   });
-  playerSeek.addEventListener("pointermove", (event) => {
-    handleSeekPointerMove(event, playerSeek);
-  });
-  playerSeek.addEventListener("pointerup", (event) => {
-    handleSeekPointerEnd(event, playerSeek);
-  });
-  playerSeek.addEventListener("pointercancel", (event) => {
-    handleSeekPointerEnd(event, playerSeek);
-  });
-  playerSeek.addEventListener("keydown", (event) => {
-    handleSeekKeydown(event, playerSeek);
+  playerSeek.addEventListener("pointerup", handleSeekCommit);
+  playerSeek.addEventListener("pointercancel", () => {
+    seekState.isScrubbing = false;
   });
 }
 
 if (miniSeek && audioPlayer) {
-  miniSeek.addEventListener("pointerdown", (event) => {
-    handleSeekPointerDown(event, miniSeek);
+  miniSeek.addEventListener("input", handleSeekInput);
+  miniSeek.addEventListener("change", handleSeekCommit);
+  miniSeek.addEventListener("pointerdown", () => {
+    seekState.isScrubbing = true;
   });
-  miniSeek.addEventListener("pointermove", (event) => {
-    handleSeekPointerMove(event, miniSeek);
-  });
-  miniSeek.addEventListener("pointerup", (event) => {
-    handleSeekPointerEnd(event, miniSeek);
-  });
-  miniSeek.addEventListener("pointercancel", (event) => {
-    handleSeekPointerEnd(event, miniSeek);
-  });
-  miniSeek.addEventListener("keydown", (event) => {
-    handleSeekKeydown(event, miniSeek);
+  miniSeek.addEventListener("pointerup", handleSeekCommit);
+  miniSeek.addEventListener("pointercancel", () => {
+    seekState.isScrubbing = false;
   });
 }
 

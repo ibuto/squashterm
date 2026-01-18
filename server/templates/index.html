@@ -201,20 +201,7 @@
         </div>
         <div class="player-progress">
           <span id="player-current">0:00</span>
-          <div
-            class="seek-bar"
-            id="player-seek"
-            role="slider"
-            tabindex="0"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-valuenow="0"
-          >
-            <div class="seek-track">
-              <div class="seek-fill"></div>
-              <div class="seek-thumb" aria-hidden="true"></div>
-            </div>
-          </div>
+          <input type="range" id="player-seek" min="0" max="100" value="0" />
           <span id="player-duration">0:00</span>
         </div>
       </div>
@@ -235,20 +222,7 @@
         <button class="secondary" type="button" id="mini-expand">画面を開く</button>
       </div>
       <div class="mini-progress">
-        <div
-          class="seek-bar"
-          id="mini-seek"
-          role="slider"
-          tabindex="0"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow="0"
-        >
-          <div class="seek-track">
-            <div class="seek-fill"></div>
-            <div class="seek-thumb" aria-hidden="true"></div>
-          </div>
-        </div>
+        <input type="range" id="mini-seek" min="0" max="100" value="0" />
       </div>
     </div>
 
