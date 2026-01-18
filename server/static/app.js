@@ -38,6 +38,7 @@ const miniToggle = document.getElementById("mini-toggle");
 const miniPrev = document.getElementById("mini-prev");
 const miniNext = document.getElementById("mini-next");
 const miniExpand = document.getElementById("mini-expand");
+const miniSeek = document.getElementById("mini-seek");
 
 const state = {
   tracks: [],
@@ -98,6 +99,18 @@ const updatePlayerUI = () => {
     if (miniPlayer) {
       miniPlayer.classList.remove("is-active");
       miniPlayer.setAttribute("aria-hidden", "true");
+    }
+    if (playerSeek) {
+      playerSeek.value = 0;
+    }
+    if (miniSeek) {
+      miniSeek.value = 0;
+    }
+    if (playerCurrent) {
+      playerCurrent.textContent = "0:00";
+    }
+    if (playerDuration) {
+      playerDuration.textContent = "0:00";
     }
     return;
   }
@@ -343,6 +356,13 @@ const appendImportLog = (message) => {
   if (!importLog) {
     return;
   }
+  const maxLength = 3000;
+  if (message.length > maxLength) {
+    importLog.textContent = `ログが長いため末尾のみ表示します。\n\n${message.slice(
+      -maxLength
+    )}`;
+    return;
+  }
   importLog.textContent = message;
 };
 
@@ -424,11 +444,14 @@ if (audioPlayer) {
   });
 
   audioPlayer.addEventListener("timeupdate", () => {
-    if (!playerSeek) {
-      return;
-    }
     const { currentTime, duration } = audioPlayer;
-    playerSeek.value = duration ? Math.floor((currentTime / duration) * 100) : 0;
+    const percent = duration ? Math.floor((currentTime / duration) * 100) : 0;
+    if (playerSeek) {
+      playerSeek.value = percent;
+    }
+    if (miniSeek) {
+      miniSeek.value = percent;
+    }
     if (playerCurrent) {
       playerCurrent.textContent = formatTime(currentTime);
     }
@@ -444,6 +467,15 @@ if (audioPlayer) {
 
 if (playerSeek && audioPlayer) {
   playerSeek.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    if (Number.isFinite(value) && audioPlayer.duration) {
+      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
+    }
+  });
+}
+
+if (miniSeek && audioPlayer) {
+  miniSeek.addEventListener("input", (event) => {
     const value = Number(event.target.value);
     if (Number.isFinite(value) && audioPlayer.duration) {
       audioPlayer.currentTime = (value / 100) * audioPlayer.duration;

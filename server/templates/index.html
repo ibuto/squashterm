@@ -15,19 +15,15 @@
           </div>
           <nav class="nav-menu" role="tablist">
             <button class="nav-button is-active" data-tab="media" role="tab">
-              <span class="icon">🎵</span>
               <span class="label">メディア</span>
             </button>
             <button class="nav-button" data-tab="playlist" role="tab">
-              <span class="icon">📂</span>
               <span class="label">プレイリスト</span>
             </button>
             <button class="nav-button" data-tab="manage" role="tab">
-              <span class="icon">🛠️</span>
               <span class="label">楽曲管理</span>
             </button>
             <button class="nav-button" data-tab="settings" role="tab">
-              <span class="icon">⚙️</span>
               <span class="label">設定</span>
             </button>
           </nav>
@@ -199,9 +195,9 @@
           <p class="player-meta" id="player-album">--</p>
         </div>
         <div class="player-controls">
-          <button class="secondary" type="button" id="player-prev">⏮️</button>
+          <button class="secondary" type="button" id="player-prev">前へ</button>
           <button class="primary" type="button" id="player-toggle">再生</button>
-          <button class="secondary" type="button" id="player-next">⏭️</button>
+          <button class="secondary" type="button" id="player-next">次へ</button>
         </div>
         <div class="player-progress">
           <span id="player-current">0:00</span>
@@ -220,10 +216,13 @@
         </div>
       </div>
       <div class="mini-controls">
-        <button class="secondary" type="button" id="mini-prev">⏮️</button>
+        <button class="secondary" type="button" id="mini-prev">前へ</button>
         <button class="primary" type="button" id="mini-toggle">再生</button>
-        <button class="secondary" type="button" id="mini-next">⏭️</button>
+        <button class="secondary" type="button" id="mini-next">次へ</button>
         <button class="secondary" type="button" id="mini-expand">画面を開く</button>
+      </div>
+      <div class="mini-progress">
+        <input type="range" id="mini-seek" min="0" max="100" value="0" />
       </div>
     </div>
 
