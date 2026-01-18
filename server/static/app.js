@@ -51,6 +51,8 @@ const playerState = {
   isPlaying: false,
 };
 
+let isUserSeeking = false;
+
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     tabs.forEach((button) => button.classList.remove("is-active"));
@@ -143,6 +145,31 @@ const updatePlayerUI = () => {
     miniPlayer.setAttribute("aria-hidden", "false");
   }
   updatePlayerButtons();
+};
+
+const syncSeekBars = (value) => {
+  if (playerSeek) {
+    playerSeek.value = value;
+  }
+  if (miniSeek) {
+    miniSeek.value = value;
+  }
+};
+
+const updateAudioCurrentTime = (value) => {
+  if (!audioPlayer || !audioPlayer.duration) {
+    return;
+  }
+  audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
+};
+
+const handleSeekInput = (event) => {
+  const value = Number(event.target.value);
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  syncSeekBars(value);
+  updateAudioCurrentTime(value);
 };
 
 const openPlayerOverlay = () => {
@@ -446,11 +473,8 @@ if (audioPlayer) {
   audioPlayer.addEventListener("timeupdate", () => {
     const { currentTime, duration } = audioPlayer;
     const percent = duration ? Math.floor((currentTime / duration) * 100) : 0;
-    if (playerSeek) {
-      playerSeek.value = percent;
-    }
-    if (miniSeek) {
-      miniSeek.value = percent;
+    if (!isUserSeeking) {
+      syncSeekBars(percent);
     }
     if (playerCurrent) {
       playerCurrent.textContent = formatTime(currentTime);
@@ -466,20 +490,34 @@ if (audioPlayer) {
 }
 
 if (playerSeek && audioPlayer) {
-  playerSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
+  playerSeek.addEventListener("input", handleSeekInput);
+  playerSeek.addEventListener("change", handleSeekInput);
+  playerSeek.addEventListener("pointerdown", () => {
+    isUserSeeking = true;
+  });
+  playerSeek.addEventListener("pointerup", (event) => {
+    isUserSeeking = false;
+    handleSeekInput(event);
+  });
+  playerSeek.addEventListener("pointercancel", (event) => {
+    isUserSeeking = false;
+    handleSeekInput(event);
   });
 }
 
 if (miniSeek && audioPlayer) {
-  miniSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
+  miniSeek.addEventListener("input", handleSeekInput);
+  miniSeek.addEventListener("change", handleSeekInput);
+  miniSeek.addEventListener("pointerdown", () => {
+    isUserSeeking = true;
+  });
+  miniSeek.addEventListener("pointerup", (event) => {
+    isUserSeeking = false;
+    handleSeekInput(event);
+  });
+  miniSeek.addEventListener("pointercancel", (event) => {
+    isUserSeeking = false;
+    handleSeekInput(event);
   });
 }
 
