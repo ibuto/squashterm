@@ -142,6 +142,12 @@ const applySeekPercent = (percent) => {
 
 const getSeekPercentFromEvent = (event, element) => {
   const rect = element.getBoundingClientRect();
+  if (!Number.isFinite(rect.width) || rect.width <= 0) {
+    return seekState.lastPercent;
+  }
+  if (!Number.isFinite(event.clientX)) {
+    return seekState.lastPercent;
+  }
   const x = event.clientX - rect.left;
   return clamp((x / rect.width) * 100, 0, 100);
 };
@@ -180,10 +186,8 @@ const handleSeekPointerEnd = (event, element) => {
   if (event.type !== "pointercancel") {
     const percent = getSeekPercentFromEvent(event, element);
     setSeekPercent(percent);
-    applySeekPercent(percent);
-  } else {
-    applySeekPercent(seekState.lastPercent);
   }
+  applySeekPercent(seekState.lastPercent);
   seekState.isScrubbing = false;
   seekState.activeSeek = null;
 };
