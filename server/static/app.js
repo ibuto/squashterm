@@ -53,6 +53,7 @@ const playerState = {
 };
 
 let isSeeking = false;
+let pendingSeekPercent = null;
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -171,7 +172,7 @@ const updateSeekUI = ({ currentTime, duration, percent }) => {
   }
 };
 
-const handleSeekInput = (value) => {
+const handleSeekInput = (value, { apply = false } = {}) => {
   if (!audioPlayer) {
     return;
   }
@@ -180,11 +181,20 @@ const handleSeekInput = (value) => {
   }
   const { duration } = audioPlayer;
   if (!Number.isFinite(duration) || duration <= 0) {
-    updateSeekUI({ currentTime: 0, duration: 0, percent: value });
+    pendingSeekPercent = value;
+    if (!apply) {
+      updateSeekUI({
+        currentTime: audioPlayer.currentTime || 0,
+        duration: 0,
+        percent: value,
+      });
+    }
     return;
   }
   const nextTime = (value / 100) * duration;
-  audioPlayer.currentTime = nextTime;
+  if (apply) {
+    audioPlayer.currentTime = nextTime;
+  }
   updateSeekUI({ currentTime: nextTime, duration, percent: value });
 };
 
@@ -495,6 +505,19 @@ if (audioPlayer) {
     updateSeekUI({ currentTime, duration, percent });
   });
 
+  audioPlayer.addEventListener("loadedmetadata", () => {
+    const { duration, currentTime } = audioPlayer;
+    if (pendingSeekPercent !== null) {
+      handleSeekInput(pendingSeekPercent, { apply: true });
+      pendingSeekPercent = null;
+      return;
+    }
+    if (Number.isFinite(duration) && duration > 0) {
+      const percent = Math.floor((currentTime / duration) * 100);
+      updateSeekUI({ currentTime, duration, percent });
+    }
+  });
+
   audioPlayer.addEventListener("ended", () => {
     playNext();
   });
@@ -504,26 +527,28 @@ const bindSeekEvents = (seekElement) => {
   if (!seekElement) {
     return;
   }
-  seekElement.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    handleSeekInput(value);
-  });
-  seekElement.addEventListener("pointerdown", () => {
+  const startSeek = () => {
     isSeeking = true;
-  });
-  seekElement.addEventListener("pointerup", (event) => {
+  };
+  const endSeek = (event) => {
     isSeeking = false;
     const value = Number(event.target.value);
-    handleSeekInput(value);
+    handleSeekInput(value, { apply: true });
+  };
+  seekElement.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    handleSeekInput(value, { apply: false });
   });
+  seekElement.addEventListener("pointerdown", startSeek);
+  seekElement.addEventListener("pointerup", endSeek);
   seekElement.addEventListener("pointercancel", () => {
     isSeeking = false;
   });
-  seekElement.addEventListener("change", (event) => {
-    isSeeking = false;
-    const value = Number(event.target.value);
-    handleSeekInput(value);
-  });
+  seekElement.addEventListener("mousedown", startSeek);
+  seekElement.addEventListener("mouseup", endSeek);
+  seekElement.addEventListener("touchstart", startSeek, { passive: true });
+  seekElement.addEventListener("touchend", endSeek);
+  seekElement.addEventListener("change", endSeek);
 };
 
 if (audioPlayer) {
