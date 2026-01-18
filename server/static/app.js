@@ -39,6 +39,7 @@ const miniPrev = document.getElementById("mini-prev");
 const miniNext = document.getElementById("mini-next");
 const miniExpand = document.getElementById("mini-expand");
 const miniSeek = document.getElementById("mini-seek");
+const miniCurrent = document.getElementById("mini-current");
 
 const state = {
   tracks: [],
@@ -50,6 +51,8 @@ const playerState = {
   currentIndex: -1,
   isPlaying: false,
 };
+
+let isSeeking = false;
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -109,6 +112,9 @@ const updatePlayerUI = () => {
     if (playerCurrent) {
       playerCurrent.textContent = "0:00";
     }
+    if (miniCurrent) {
+      miniCurrent.textContent = "0:00";
+    }
     if (playerDuration) {
       playerDuration.textContent = "0:00";
     }
@@ -143,6 +149,43 @@ const updatePlayerUI = () => {
     miniPlayer.setAttribute("aria-hidden", "false");
   }
   updatePlayerButtons();
+};
+
+const updateSeekUI = ({ currentTime, duration, percent }) => {
+  if (Number.isFinite(percent)) {
+    if (playerSeek) {
+      playerSeek.value = percent;
+    }
+    if (miniSeek) {
+      miniSeek.value = percent;
+    }
+  }
+  if (playerCurrent) {
+    playerCurrent.textContent = formatTime(currentTime);
+  }
+  if (miniCurrent) {
+    miniCurrent.textContent = formatTime(currentTime);
+  }
+  if (playerDuration) {
+    playerDuration.textContent = formatTime(duration);
+  }
+};
+
+const handleSeekInput = (value) => {
+  if (!audioPlayer) {
+    return;
+  }
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  const { duration } = audioPlayer;
+  if (!Number.isFinite(duration) || duration <= 0) {
+    updateSeekUI({ currentTime: 0, duration: 0, percent: value });
+    return;
+  }
+  const nextTime = (value / 100) * duration;
+  audioPlayer.currentTime = nextTime;
+  updateSeekUI({ currentTime: nextTime, duration, percent: value });
 };
 
 const openPlayerOverlay = () => {
@@ -446,18 +489,10 @@ if (audioPlayer) {
   audioPlayer.addEventListener("timeupdate", () => {
     const { currentTime, duration } = audioPlayer;
     const percent = duration ? Math.floor((currentTime / duration) * 100) : 0;
-    if (playerSeek) {
-      playerSeek.value = percent;
+    if (isSeeking) {
+      return;
     }
-    if (miniSeek) {
-      miniSeek.value = percent;
-    }
-    if (playerCurrent) {
-      playerCurrent.textContent = formatTime(currentTime);
-    }
-    if (playerDuration) {
-      playerDuration.textContent = formatTime(duration);
-    }
+    updateSeekUI({ currentTime, duration, percent });
   });
 
   audioPlayer.addEventListener("ended", () => {
@@ -465,22 +500,35 @@ if (audioPlayer) {
   });
 }
 
-if (playerSeek && audioPlayer) {
-  playerSeek.addEventListener("input", (event) => {
+const bindSeekEvents = (seekElement) => {
+  if (!seekElement) {
+    return;
+  }
+  seekElement.addEventListener("input", (event) => {
     const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
+    handleSeekInput(value);
   });
-}
+  seekElement.addEventListener("pointerdown", () => {
+    isSeeking = true;
+  });
+  seekElement.addEventListener("pointerup", (event) => {
+    isSeeking = false;
+    const value = Number(event.target.value);
+    handleSeekInput(value);
+  });
+  seekElement.addEventListener("pointercancel", () => {
+    isSeeking = false;
+  });
+  seekElement.addEventListener("change", (event) => {
+    isSeeking = false;
+    const value = Number(event.target.value);
+    handleSeekInput(value);
+  });
+};
 
-if (miniSeek && audioPlayer) {
-  miniSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
-  });
+if (audioPlayer) {
+  bindSeekEvents(playerSeek);
+  bindSeekEvents(miniSeek);
 }
 
 if (playerToggle) {
