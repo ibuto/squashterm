@@ -51,6 +51,8 @@ const playerState = {
   isPlaying: false,
 };
 
+let isUserSeeking = false;
+
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     tabs.forEach((button) => button.classList.remove("is-active"));
@@ -143,6 +145,75 @@ const updatePlayerUI = () => {
     miniPlayer.setAttribute("aria-hidden", "false");
   }
   updatePlayerButtons();
+};
+
+const syncSeekBars = (value) => {
+  if (playerSeek) {
+    playerSeek.value = value;
+  }
+  if (miniSeek) {
+    miniSeek.value = value;
+  }
+};
+
+const updateAudioCurrentTime = (value) => {
+  if (!audioPlayer || !audioPlayer.duration) {
+    return;
+  }
+  audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
+};
+
+const handleSeekInput = (event) => {
+  const value = Number(event.target.value);
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  syncSeekBars(value);
+  updateAudioCurrentTime(value);
+};
+
+const setSeekingState = (value) => {
+  isUserSeeking = value;
+};
+
+const attachSeekHandlers = (seekElement) => {
+  if (!seekElement) {
+    return;
+  }
+  seekElement.addEventListener("input", handleSeekInput);
+  seekElement.addEventListener("change", handleSeekInput);
+  seekElement.addEventListener("pointerdown", () => {
+    setSeekingState(true);
+  });
+  seekElement.addEventListener("pointerup", (event) => {
+    setSeekingState(false);
+    handleSeekInput(event);
+  });
+  seekElement.addEventListener("pointercancel", (event) => {
+    setSeekingState(false);
+    handleSeekInput(event);
+  });
+  seekElement.addEventListener("mousedown", () => {
+    setSeekingState(true);
+  });
+  seekElement.addEventListener("mouseup", (event) => {
+    setSeekingState(false);
+    handleSeekInput(event);
+  });
+  seekElement.addEventListener("touchstart", () => {
+    setSeekingState(true);
+  });
+  seekElement.addEventListener("touchend", (event) => {
+    setSeekingState(false);
+    handleSeekInput(event);
+  });
+  seekElement.addEventListener("touchcancel", (event) => {
+    setSeekingState(false);
+    handleSeekInput(event);
+  });
+  seekElement.addEventListener("mouseleave", () => {
+    setSeekingState(false);
+  });
 };
 
 const openPlayerOverlay = () => {
@@ -446,11 +517,8 @@ if (audioPlayer) {
   audioPlayer.addEventListener("timeupdate", () => {
     const { currentTime, duration } = audioPlayer;
     const percent = duration ? Math.floor((currentTime / duration) * 100) : 0;
-    if (playerSeek) {
-      playerSeek.value = percent;
-    }
-    if (miniSeek) {
-      miniSeek.value = percent;
+    if (!isUserSeeking) {
+      syncSeekBars(percent);
     }
     if (playerCurrent) {
       playerCurrent.textContent = formatTime(currentTime);
@@ -466,21 +534,11 @@ if (audioPlayer) {
 }
 
 if (playerSeek && audioPlayer) {
-  playerSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
-  });
+  attachSeekHandlers(playerSeek);
 }
 
 if (miniSeek && audioPlayer) {
-  miniSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
-  });
+  attachSeekHandlers(miniSeek);
 }
 
 if (playerToggle) {
