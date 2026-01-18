@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SquashTerm</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="brand">
+            <p class="eyebrow">SquashTerm</p>
+          </div>
+          <nav class="nav-menu" role="tablist">
+            <button class="nav-button is-active" data-tab="media" role="tab">
+              <span class="icon">🎵</span>
+              <span class="label">メディア</span>
+            </button>
+            <button class="nav-button" data-tab="playlist" role="tab">
+              <span class="icon">📂</span>
+              <span class="label">プレイリスト</span>
+            </button>
+            <button class="nav-button" data-tab="manage" role="tab">
+              <span class="icon">🛠️</span>
+              <span class="label">楽曲管理</span>
+            </button>
+            <button class="nav-button" data-tab="settings" role="tab">
+              <span class="icon">⚙️</span>
+              <span class="label">設定</span>
+            </button>
+          </nav>
+        </aside>
+
+        <main class="content">
+          <header class="app-header">
+            <div>
+              <h2>SquashTerm</h2>
+              <p class="subheading">
+                An open-source music terminal.
+              </p>
+            </div>
+            <div class="status-card" id="status-card">
+              <p class="status-title">システムステータス</p>
+              <dl>
+                <div>
+                  <dt>バージョン</dt>
+                  <dd id="status-version">--</dd>
+                </div>
+                <div>
+                  <dt>デバイス</dt>
+                  <dd id="status-device">--</dd>
+                </div>
+                <div>
+                  <dt>時刻 (UTC)</dt>
+                  <dd id="status-time">--</dd>
+                </div>
+              </dl>
+            </div>
+          </header>
+
+          <section class="panel is-active" id="panel-media" role="tabpanel">
+            <div class="panel-header">
+              <div>
+                <h3>メディアライブラリ</h3>
+                <p>アルバムカバーとタグ情報をカード形式で表示。</p>
+              </div>
+              <div class="now-playing" id="now-playing">
+                <p class="label">Now Playing</p>
+                <p class="track">--</p>
+                <p class="meta">--</p>
+              </div>
+            </div>
+            <div class="media-grid" id="media-grid"></div>
+          </section>
+
+          <section class="panel" id="panel-playlist" role="tabpanel">
+            <div class="panel-header">
+              <div>
+                <h3>プレイリスト / お気に入り</h3>
+                <p>作成済みプレイリストとお気に入り楽曲を一覧。</p>
+              </div>
+              <button class="primary">新規プレイリスト作成</button>
+            </div>
+            <div class="playlist-layout">
+              <div class="playlist-list" id="playlist-list"></div>
+              <div class="favorites" id="favorites"></div>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-manage" role="tabpanel">
+            <div class="panel-header">
+              <div>
+                <h3>楽曲管理</h3>
+                <p>yt-dlp による取り込みと ID3 タグ編集をまとめて操作。</p>
+              </div>
+              <div class="chip">yt-dlp連携</div>
+            </div>
+            <div class="manage-grid">
+              <form class="card">
+                <h4>新規楽曲追加</h4>
+                <label>
+                  <span>動画/プレイリスト URL</span>
+                  <input type="url" placeholder="https://www.youtube.com/watch?v=..." />
+                </label>
+                <label>
+                  <span>保存先プレイリスト</span>
+                  <select>
+                    <option>朝のルーティン</option>
+                    <option>クールダウン</option>
+                    <option>未分類</option>
+                  </select>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" checked />
+                  <span>ダウンロード後に自動でID3タグを解析</span>
+                </label>
+                <button type="button" class="primary">追加ジョブをキュー</button>
+              </form>
+
+              <form class="card">
+                <h4>ID3タグの編集</h4>
+                <label>
+                  <span>対象楽曲</span>
+                  <select id="tag-track-select"></select>
+                </label>
+                <label>
+                  <span>タイトル</span>
+                  <input type="text" placeholder="楽曲タイトル" />
+                </label>
+                <label>
+                  <span>アーティスト</span>
+                  <input type="text" placeholder="アーティスト名" />
+                </label>
+                <label>
+                  <span>アルバム</span>
+                  <input type="text" placeholder="アルバム名" />
+                </label>
+                <button type="button" class="secondary">変更内容を保存</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-settings" role="tabpanel">
+            <div class="panel-header">
+              <div>
+                <h3>設定</h3>
+                <p>端末情報、ストレージ、再生設定の概要。</p>
+              </div>
+              <button class="secondary">設定を保存</button>
+            </div>
+            <div class="settings-grid">
+              <div class="card">
+                <h4>バージョン情報</h4>
+                <ul>
+                  <li>アプリ: <strong>0.1.0</strong></li>
+                  <li>API: <strong>Python HTTP Server</strong></li>
+                  <li>ビルド: <strong>2024.11.18</strong></li>
+                </ul>
+              </div>
+              <div class="card">
+                <h4>ストレージ</h4>
+                <div class="progress">
+                  <div class="progress-bar" style="width: 42%"></div>
+                </div>
+                <p>楽曲: 3.8GB / 9.0GB (仮)</p>
+              </div>
+              <div class="card">
+                <h4>再生設定</h4>
+                <label class="checkbox">
+                  <input type="checkbox" checked />
+                  <span>ネットワークからのアクセスを許可</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" />
+                  <span>自動ライブラリスキャン</span>
+                </label>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

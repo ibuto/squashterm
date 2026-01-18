@@ -1,0 +1,405 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+}
+
+.sidebar {
+  background: #111827;
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  position: sticky;
+  top: 24px;
+  height: fit-content;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 12px;
+  margin: 0 0 8px;
+  color: #94a3b8;
+}
+
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nav-button {
+  border: 1px solid transparent;
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.nav-button .icon {
+  font-size: 18px;
+}
+
+.nav-button.is-active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.3);
+}
+
+.content {
+  display: grid;
+  gap: 24px;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-header h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.subheading {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.status-card {
+  background: #111827;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
+  min-width: 240px;
+}
+
+.status-card dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.status-card div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #cbd5f5;
+}
+
+.status-title {
+  margin: 0 0 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.panel {
+  display: none;
+  background: #111827;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.45);
+}
+
+.panel.is-active {
+  display: block;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.panel-header h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.media-card {
+  background: #1f2937;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);
+}
+
+.media-card img {
+  width: 100%;
+  border-radius: 14px;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.media-card h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.media-card p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.media-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.play-button {
+  border: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.now-playing {
+  background: rgba(37, 99, 235, 0.15);
+  border-radius: 16px;
+  padding: 12px 16px;
+  min-width: 220px;
+}
+
+.now-playing .label {
+  margin: 0;
+  font-size: 12px;
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.now-playing .track {
+  margin: 6px 0 2px;
+  font-weight: 700;
+}
+
+.now-playing .meta {
+  margin: 0;
+  font-size: 12px;
+  color: #cbd5f5;
+}
+
+.playlist-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.playlist-card {
+  background: #1f2937;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.playlist-card h3 {
+  margin: 0;
+}
+
+.favorites {
+  background: #1e293b;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.manage-grid,
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: #1f2937;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.card h4 {
+  margin: 0;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: #e2e8f0;
+}
+
+input,
+select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  font-size: 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.primary,
+.secondary {
+  border: none;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.secondary {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+}
+
+.chip {
+  background: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.progress {
+  background: #334155;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  background: #22c55e;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    top: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    border-radius: 999px;
+    z-index: 10;
+  }
+
+  .brand {
+    display: none;
+  }
+
+  .nav-menu {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .nav-button {
+    flex-direction: column;
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+  }
+
+  .nav-button .label {
+    font-size: 10px;
+  }
+
+  .content {
+    padding-bottom: 100px;
+  }
+
+  .playlist-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .app {
+    padding: 16px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .app-header h2 {
+    font-size: 22px;
+  }
+}

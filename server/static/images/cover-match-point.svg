@@ -1,0 +1,6 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="320" rx="24" fill="#2F855A"/>
+  <path d="M64 240C110 180 170 160 256 120" stroke="#C6F6D5" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="210" cy="136" r="28" fill="#F6E05E"/>
+  <text x="32" y="52" fill="#F0FFF4" font-family="Arial" font-size="24" font-weight="bold">Match Point</text>
+</svg>

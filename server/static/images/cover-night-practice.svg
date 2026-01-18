@@ -1,0 +1,6 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="320" rx="24" fill="#1A202C"/>
+  <circle cx="110" cy="140" r="60" fill="#4FD1C5" opacity="0.85"/>
+  <circle cx="200" cy="190" r="36" fill="#63B3ED" opacity="0.75"/>
+  <text x="32" y="52" fill="#EDF2F7" font-family="Arial" font-size="24" font-weight="bold">Night Practice</text>
+</svg>
