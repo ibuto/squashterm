@@ -73,6 +73,45 @@ def _parse_track_from_info(info: dict) -> Track:
     )
 
 
+def _resolve_thumbnail_path(info: dict) -> str | None:
+    track_id = info.get("id")
+    if not track_id:
+        return None
+    candidates: list[str] = []
+    thumbnails = info.get("thumbnails") or []
+    if isinstance(thumbnails, list):
+        for thumb in thumbnails:
+            if not isinstance(thumb, dict):
+                continue
+            ext = thumb.get("ext")
+            if isinstance(ext, str):
+                candidates.append(ext.lower())
+            url = thumb.get("url")
+            if isinstance(url, str) and "." in url:
+                candidates.append(url.rsplit(".", 1)[-1].lower())
+    thumbnail_url = info.get("thumbnail")
+    if isinstance(thumbnail_url, str) and "." in thumbnail_url:
+        candidates.append(thumbnail_url.rsplit(".", 1)[-1].lower())
+    known_exts = [".webp", ".jpg", ".jpeg", ".png", ".avif"]
+    ordered_exts = []
+    for ext in candidates:
+        ext_with_dot = f".{ext.lstrip('.')}"
+        if ext_with_dot in known_exts and ext_with_dot not in ordered_exts:
+            ordered_exts.append(ext_with_dot)
+    for ext in known_exts:
+        if ext not in ordered_exts:
+            ordered_exts.append(ext)
+    for ext in ordered_exts:
+        candidate = MEDIA_DIR / f"{track_id}{ext}"
+        if candidate.exists():
+            return f"/media/{candidate.name}"
+    for candidate in MEDIA_DIR.glob(f"{track_id}.*"):
+        if candidate.suffix.lower() in {".json", ".mp3"}:
+            continue
+        return f"/media/{candidate.name}"
+    return None
+
+
 def _init_library() -> None:
     _ensure_data_dirs()
     if LIBRARY_PATH.exists():
@@ -177,12 +216,19 @@ def _store_downloaded_tracks(infos: list[dict]) -> list[Track]:
     track_map = {track["id"]: track for track in tracks}
     for info in infos:
         track = _parse_track_from_info(info)
+        resolved_cover = _resolve_thumbnail_path(info)
+        if resolved_cover:
+            track.cover = resolved_cover
         file_path = MEDIA_DIR / f"{info.get('id', track.id)}.mp3"
         track.file_url = f"/media/{file_path.name}"
         if track.id not in track_map:
             track_entry = {**asdict(track), "file_path": str(file_path)}
             tracks.append(track_entry)
             track_map[track.id] = track_entry
+        else:
+            track_entry = track_map[track.id]
+            if resolved_cover and track_entry.get("cover") in ("", DEFAULT_COVER):
+                track_entry["cover"] = resolved_cover
         stored_tracks.append(track)
     _save_library(data)
     return stored_tracks
