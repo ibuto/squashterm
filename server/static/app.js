@@ -525,7 +525,10 @@ if (audioPlayer) {
 
   audioPlayer.addEventListener("timeupdate", () => {
     const { currentTime, duration } = audioPlayer;
-    const percent = duration ? Math.floor((currentTime / duration) * 100) : 0;
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return;
+    }
+    const percent = Math.floor((currentTime / duration) * 100);
     if (isSeeking) {
       return;
     }
