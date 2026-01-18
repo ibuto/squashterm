@@ -55,6 +55,7 @@ const seekState = {
   isScrubbing: false,
   lastPercent: 0,
   activeSeek: null,
+  pendingPercent: null,
 };
 
 tabs.forEach((tab) => {
@@ -124,12 +125,30 @@ const setSeekPercent = (percent) => {
   }
 };
 
-const applySeekPercent = (percent) => {
+const getSeekDuration = () => {
+  if (!audioPlayer) {
+    return null;
+  }
+  const duration = audioPlayer.duration;
+  if (Number.isFinite(duration) && duration > 0) {
+    return duration;
+  }
+  if (audioPlayer.seekable && audioPlayer.seekable.length > 0) {
+    const end = audioPlayer.seekable.end(audioPlayer.seekable.length - 1);
+    if (Number.isFinite(end) && end > 0) {
+      return end;
+    }
+  }
+  return null;
+};
+
+const commitSeekPercent = (percent) => {
   if (!audioPlayer) {
     return;
   }
-  const duration = audioPlayer.duration;
-  if (!Number.isFinite(duration) || duration <= 0) {
+  const duration = getSeekDuration();
+  if (!Number.isFinite(duration)) {
+    seekState.pendingPercent = clamp(percent, 0, 100);
     return;
   }
   const clamped = clamp(percent, 0, 100);
@@ -138,6 +157,7 @@ const applySeekPercent = (percent) => {
   if (playerCurrent) {
     playerCurrent.textContent = formatTime(targetTime);
   }
+  seekState.pendingPercent = null;
 };
 
 const getSeekPercentFromEvent = (event, element) => {
@@ -164,7 +184,7 @@ const handleSeekPointerDown = (event, element) => {
   }
   const percent = getSeekPercentFromEvent(event, element);
   setSeekPercent(percent);
-  applySeekPercent(percent);
+  seekState.pendingPercent = percent;
 };
 
 const handleSeekPointerMove = (event, element) => {
@@ -173,7 +193,7 @@ const handleSeekPointerMove = (event, element) => {
   }
   const percent = getSeekPercentFromEvent(event, element);
   setSeekPercent(percent);
-  applySeekPercent(percent);
+  seekState.pendingPercent = percent;
 };
 
 const handleSeekPointerEnd = (event, element) => {
@@ -187,7 +207,7 @@ const handleSeekPointerEnd = (event, element) => {
     const percent = getSeekPercentFromEvent(event, element);
     setSeekPercent(percent);
   }
-  applySeekPercent(seekState.lastPercent);
+  commitSeekPercent(seekState.lastPercent);
   seekState.isScrubbing = false;
   seekState.activeSeek = null;
 };
@@ -223,7 +243,7 @@ const handleSeekKeydown = (event, element) => {
   }
   event.preventDefault();
   setSeekPercent(percent);
-  applySeekPercent(percent);
+  commitSeekPercent(percent);
 };
 
 const updatePlayerButtons = () => {
@@ -596,6 +616,12 @@ if (audioPlayer) {
     }
     if (playerDuration) {
       playerDuration.textContent = formatTime(duration);
+    }
+  });
+
+  audioPlayer.addEventListener("loadedmetadata", () => {
+    if (Number.isFinite(seekState.pendingPercent)) {
+      commitSeekPercent(seekState.pendingPercent);
     }
   });
 
