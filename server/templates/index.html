@@ -35,11 +35,16 @@
 
         <main class="content">
           <header class="app-header">
-            <div>
-              <h2>SquashTerm</h2>
-              <p class="subheading">
-                An open-source music terminal.
-              </p>
+            <div class="title-block">
+              <div class="title-bar">
+                <img class="app-logo" src="/static/images/logo.png" alt="SquashTerm logo" />
+                <div>
+                  <h2>SquashTerm</h2>
+                  <p class="subheading">
+                    An open-source music terminal.
+                  </p>
+                </div>
+              </div>
             </div>
             <div class="status-card" id="status-card">
               <p class="status-title">システムステータス</p>
@@ -101,17 +106,13 @@
               <form class="card" id="import-form">
                 <h4>新規楽曲追加</h4>
                 <label>
-                  <span>動画/プレイリスト URL</span>
+                  <span>動画 URL</span>
                   <input
                     type="url"
                     id="import-url"
                     placeholder="https://www.youtube.com/watch?v=..."
                     required
                   />
-                </label>
-                <label>
-                  <span>保存先プレイリスト</span>
-                  <select id="import-playlist"></select>
                 </label>
                 <label class="checkbox">
                   <input type="checkbox" id="import-auto-tag" checked />
@@ -187,6 +188,46 @@
         </main>
       </div>
     </div>
+
+    <section class="player-overlay" id="player-overlay" aria-hidden="true">
+      <div class="player-overlay-content">
+        <button class="player-close" type="button" id="player-close">×</button>
+        <img class="player-cover" id="player-cover" src="" alt="" />
+        <div class="player-info">
+          <h2 id="player-title">--</h2>
+          <p id="player-artist">--</p>
+          <p class="player-meta" id="player-album">--</p>
+        </div>
+        <div class="player-controls">
+          <button class="secondary" type="button" id="player-prev">⏮️</button>
+          <button class="primary" type="button" id="player-toggle">再生</button>
+          <button class="secondary" type="button" id="player-next">⏭️</button>
+        </div>
+        <div class="player-progress">
+          <span id="player-current">0:00</span>
+          <input type="range" id="player-seek" min="0" max="100" value="0" />
+          <span id="player-duration">0:00</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="mini-player" id="mini-player" aria-hidden="true">
+      <div class="mini-info">
+        <img class="mini-cover" id="mini-cover" src="" alt="" />
+        <div>
+          <p class="mini-title" id="mini-title">--</p>
+          <p class="mini-artist" id="mini-artist">--</p>
+        </div>
+      </div>
+      <div class="mini-controls">
+        <button class="secondary" type="button" id="mini-prev">⏮️</button>
+        <button class="primary" type="button" id="mini-toggle">再生</button>
+        <button class="secondary" type="button" id="mini-next">⏭️</button>
+        <button class="secondary" type="button" id="mini-expand">画面を開く</button>
+      </div>
+    </div>
+
+    <audio id="audio-player"></audio>
 
     <script src="/static/app.js"></script>
   </body>
