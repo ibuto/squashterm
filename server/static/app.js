@@ -54,6 +54,8 @@ const playerState = {
 
 let isSeeking = false;
 let pendingSeekPercent = null;
+let lastKnownDuration = 0;
+let lastKnownTime = 0;
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -153,6 +155,7 @@ const updatePlayerUI = () => {
 };
 
 const updateSeekUI = ({ currentTime, duration, percent }) => {
+  const hasDuration = Number.isFinite(duration) && duration > 0;
   if (Number.isFinite(percent)) {
     if (playerSeek) {
       playerSeek.value = percent;
@@ -161,14 +164,26 @@ const updateSeekUI = ({ currentTime, duration, percent }) => {
       miniSeek.value = percent;
     }
   }
+  if (Number.isFinite(currentTime) && (hasDuration || currentTime > 0)) {
+    lastKnownTime = currentTime;
+  }
+  if (hasDuration) {
+    lastKnownDuration = duration;
+  }
+  const displayTime = hasDuration
+    ? Number.isFinite(currentTime)
+      ? currentTime
+      : lastKnownTime
+    : lastKnownTime || (Number.isFinite(currentTime) ? currentTime : 0);
+  const displayDuration = hasDuration ? duration : lastKnownDuration;
   if (playerCurrent) {
-    playerCurrent.textContent = formatTime(currentTime);
+    playerCurrent.textContent = formatTime(displayTime);
   }
   if (miniCurrent) {
-    miniCurrent.textContent = formatTime(currentTime);
+    miniCurrent.textContent = formatTime(displayTime);
   }
   if (playerDuration) {
-    playerDuration.textContent = formatTime(duration);
+    playerDuration.textContent = formatTime(displayDuration);
   }
 };
 
@@ -182,9 +197,21 @@ const handleSeekInput = (value, { apply = false } = {}) => {
   const { duration } = audioPlayer;
   if (!Number.isFinite(duration) || duration <= 0) {
     pendingSeekPercent = value;
+    const fallbackDuration = lastKnownDuration;
+    if (fallbackDuration > 0) {
+      const nextTime = (value / 100) * fallbackDuration;
+      if (!apply) {
+        updateSeekUI({
+          currentTime: nextTime,
+          duration: fallbackDuration,
+          percent: value,
+        });
+      }
+      return;
+    }
     if (!apply) {
       updateSeekUI({
-        currentTime: audioPlayer.currentTime || 0,
+        currentTime: audioPlayer.currentTime,
         duration: 0,
         percent: value,
       });
