@@ -520,7 +520,6 @@ const handleSeekInput = (event) => {
   if (!Number.isFinite(value)) {
     return;
   }
-  seekState.isScrubbing = true;
   seekState.pendingPercent = value;
   setSeekPercent(value);
 };
@@ -542,7 +541,6 @@ if (playerSeek && audioPlayer) {
   playerSeek.addEventListener("pointerdown", () => {
     seekState.isScrubbing = true;
   });
-  playerSeek.addEventListener("pointerup", handleSeekCommit);
   playerSeek.addEventListener("pointercancel", () => {
     seekState.isScrubbing = false;
   });
@@ -554,7 +552,6 @@ if (miniSeek && audioPlayer) {
   miniSeek.addEventListener("pointerdown", () => {
     seekState.isScrubbing = true;
   });
-  miniSeek.addEventListener("pointerup", handleSeekCommit);
   miniSeek.addEventListener("pointercancel", () => {
     seekState.isScrubbing = false;
   });
