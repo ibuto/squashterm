@@ -19,5 +19,6 @@ python server/app.py
 
 ## 補足
 
-- 現状は UI のみで、実際のダウンロードやタグ更新はモックです。
-- `/api/*` エンドポイントはデモ用のスタブデータを返します。
+- yt-dlp を使った楽曲取り込みは `POST /api/library/import` で実行します。
+  - 送信例: `{ "url": "...", "playlist_id": "pl_001", "playlist_name": "未分類" }`
+- サーバー初回起動時に `data/library.json` を作成し、デモ用のデータを初期登録します。
