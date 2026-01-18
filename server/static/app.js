@@ -51,6 +51,11 @@ const playerState = {
   isPlaying: false,
 };
 
+const seekState = {
+  isScrubbing: false,
+  lastPercent: 0,
+};
+
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     tabs.forEach((button) => button.classList.remove("is-active"));
@@ -77,6 +82,54 @@ const formatTime = (seconds) => {
   const minutes = Math.floor(seconds / 60);
   const remainder = Math.floor(seconds % 60);
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+};
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const setSeekPercent = (percent) => {
+  const clamped = clamp(percent, 0, 100);
+  if (playerSeek) {
+    playerSeek.value = clamped;
+  }
+  if (miniSeek) {
+    miniSeek.value = clamped;
+  }
+};
+
+const applySeekPercent = (percent) => {
+  if (!audioPlayer) {
+    return;
+  }
+  const duration = audioPlayer.duration;
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return;
+  }
+  const clamped = clamp(percent, 0, 100);
+  const targetTime = (clamped / 100) * duration;
+  audioPlayer.currentTime = targetTime;
+  if (playerCurrent) {
+    playerCurrent.textContent = formatTime(targetTime);
+  }
+};
+
+const handleSeekInput = (event) => {
+  const value = event.target.valueAsNumber;
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  seekState.isScrubbing = true;
+  seekState.lastPercent = value;
+  setSeekPercent(value);
+  applySeekPercent(value);
+};
+
+const handleSeekCommit = (event) => {
+  const value = event.target.valueAsNumber;
+  if (Number.isFinite(value)) {
+    seekState.lastPercent = value;
+    applySeekPercent(value);
+  }
+  seekState.isScrubbing = false;
 };
 
 const updatePlayerButtons = () => {
@@ -446,14 +499,11 @@ if (audioPlayer) {
   audioPlayer.addEventListener("timeupdate", () => {
     const { currentTime, duration } = audioPlayer;
     const percent = duration ? Math.floor((currentTime / duration) * 100) : 0;
-    if (playerSeek) {
-      playerSeek.value = percent;
-    }
-    if (miniSeek) {
-      miniSeek.value = percent;
-    }
-    if (playerCurrent) {
-      playerCurrent.textContent = formatTime(currentTime);
+    if (!seekState.isScrubbing) {
+      setSeekPercent(percent);
+      if (playerCurrent) {
+        playerCurrent.textContent = formatTime(currentTime);
+      }
     }
     if (playerDuration) {
       playerDuration.textContent = formatTime(duration);
@@ -466,21 +516,15 @@ if (audioPlayer) {
 }
 
 if (playerSeek && audioPlayer) {
-  playerSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
-  });
+  playerSeek.addEventListener("input", handleSeekInput);
+  playerSeek.addEventListener("change", handleSeekCommit);
+  playerSeek.addEventListener("pointerup", handleSeekCommit);
 }
 
 if (miniSeek && audioPlayer) {
-  miniSeek.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value) && audioPlayer.duration) {
-      audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-    }
-  });
+  miniSeek.addEventListener("input", handleSeekInput);
+  miniSeek.addEventListener("change", handleSeekCommit);
+  miniSeek.addEventListener("pointerup", handleSeekCommit);
 }
 
 if (playerToggle) {
