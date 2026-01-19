@@ -46,11 +46,6 @@
                 <h3>メディアライブラリ</h3>
                 <p>登録されている曲一覧です。</p>
               </div>
-              <div class="now-playing" id="now-playing"><!-- TODO: 消す -->
-                <p class="label">Now Playing</p>
-                <p class="track">--</p>
-                <p class="meta">--</p>
-              </div>
             </div>
             <div class="media-grid" id="media-grid"></div>
           </section>
@@ -166,22 +161,60 @@
 
     <section class="player-overlay" id="player-overlay" aria-hidden="true">
       <div class="player-overlay-content">
-        <button class="player-close" type="button" id="player-close">×</button>
-        <img class="player-cover" id="player-cover" src="" alt="" />
-        <div class="player-info">
-          <h2 id="player-title">--</h2>
-          <p id="player-artist">--</p>
-          <p class="player-meta" id="player-album">--</p>
+        <button class="player-close" type="button" id="player-close" aria-label="閉じる">
+          ×
+        </button>
+        <div class="player-visual">
+          <img class="player-cover" id="player-cover" src="" alt="" />
         </div>
-        <div class="player-controls">
-          <button class="secondary" type="button" id="player-prev">前へ</button>
-          <button class="primary" type="button" id="player-toggle">再生</button>
-          <button class="secondary" type="button" id="player-next">次へ</button>
-        </div>
-        <div class="player-progress">
-          <span id="player-current">0:00</span>
-          <input type="range" id="player-seek" min="0" max="100" value="0" />
-          <span id="player-duration">0:00</span>
+        <div class="player-bottom">
+          <div class="player-info">
+            <h2 id="player-title">--</h2>
+            <p id="player-artist">--</p>
+            <p class="player-meta" id="player-album">--</p>
+          </div>
+          <div class="player-controls">
+            <button class="icon-button" type="button" id="player-prev" aria-label="前へ">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="5" width="3" height="14" rx="1.5" />
+                <polygon points="20,5 10,12 20,19" />
+              </svg>
+              <span class="sr-only">前へ</span>
+            </button>
+            <button
+              class="icon-button is-primary toggle-button"
+              type="button"
+              id="player-toggle"
+              aria-label="再生"
+            >
+              <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
+                <polygon points="8,5 19,12 8,19" />
+              </svg>
+              <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7" y="5" width="4" height="14" rx="1.5" />
+                <rect x="13" y="5" width="4" height="14" rx="1.5" />
+              </svg>
+              <span class="sr-only">再生</span>
+            </button>
+            <button class="icon-button" type="button" id="player-next" aria-label="次へ">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <polygon points="4,5 14,12 4,19" />
+                <rect x="17" y="5" width="3" height="14" rx="1.5" />
+              </svg>
+              <span class="sr-only">次へ</span>
+            </button>
+            <button class="icon-button" type="button" id="player-stop" aria-label="停止">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7" y="7" width="10" height="10" rx="2" />
+              </svg>
+              <span class="sr-only">停止</span>
+            </button>
+          </div>
+          <div class="player-progress">
+            <span id="player-current">0:00</span>
+            <input type="range" id="player-seek" min="0" max="100" value="0" />
+            <span id="player-duration">0:00</span>
+          </div>
         </div>
       </div>
     </section>
@@ -195,10 +228,53 @@
         </div>
       </div>
       <div class="mini-controls">
-        <button class="secondary" type="button" id="mini-prev">前へ</button>
-        <button class="primary" type="button" id="mini-toggle">再生</button>
-        <button class="secondary" type="button" id="mini-next">次へ</button>
-        <button class="secondary" type="button" id="mini-expand">画面を開く</button>
+        <button class="icon-button" type="button" id="mini-prev" aria-label="前へ">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="3" height="14" rx="1.5" />
+            <polygon points="20,5 10,12 20,19" />
+          </svg>
+          <span class="sr-only">前へ</span>
+        </button>
+        <button
+          class="icon-button is-primary toggle-button"
+          type="button"
+          id="mini-toggle"
+          aria-label="再生"
+        >
+          <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="8,5 19,12 8,19" />
+          </svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="7" y="5" width="4" height="14" rx="1.5" />
+            <rect x="13" y="5" width="4" height="14" rx="1.5" />
+          </svg>
+          <span class="sr-only">再生</span>
+        </button>
+        <button class="icon-button" type="button" id="mini-next" aria-label="次へ">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="4,5 14,12 4,19" />
+            <rect x="17" y="5" width="3" height="14" rx="1.5" />
+          </svg>
+          <span class="sr-only">次へ</span>
+        </button>
+        <button class="icon-button" type="button" id="mini-stop" aria-label="停止">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="7" y="7" width="10" height="10" rx="2" />
+          </svg>
+          <span class="sr-only">停止</span>
+        </button>
+        <button class="icon-button" type="button" id="mini-expand" aria-label="画面を開く">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M8 4H4v4M16 4h4v4M20 16v4h-4M4 16v4h4"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-width="2"
+            />
+          </svg>
+          <span class="sr-only">画面を開く</span>
+        </button>
       </div>
       <div class="mini-progress">
         <input type="range" id="mini-seek" min="0" max="100" value="0" />

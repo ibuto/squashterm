@@ -1,7 +1,6 @@
 const tabs = document.querySelectorAll(".nav-button");
 const panels = document.querySelectorAll(".panel");
 
-const nowPlaying = document.getElementById("now-playing");
 const mediaGrid = document.getElementById("media-grid");
 const playlistList = document.getElementById("playlist-list");
 const favorites = document.getElementById("favorites");
@@ -26,6 +25,7 @@ const playerAlbum = document.getElementById("player-album");
 const playerToggle = document.getElementById("player-toggle");
 const playerPrev = document.getElementById("player-prev");
 const playerNext = document.getElementById("player-next");
+const playerStop = document.getElementById("player-stop");
 const playerSeek = document.getElementById("player-seek");
 const playerCurrent = document.getElementById("player-current");
 const playerDuration = document.getElementById("player-duration");
@@ -37,6 +37,7 @@ const miniArtist = document.getElementById("mini-artist");
 const miniToggle = document.getElementById("mini-toggle");
 const miniPrev = document.getElementById("mini-prev");
 const miniNext = document.getElementById("mini-next");
+const miniStop = document.getElementById("mini-stop");
 const miniExpand = document.getElementById("mini-expand");
 const miniSeek = document.getElementById("mini-seek");
 
@@ -63,13 +64,6 @@ tabs.forEach((tab) => {
   });
 });
 
-const renderNowPlaying = (track) => {
-  const title = track ? track.title : "項目が存在しません。";
-  const meta = track ? `${track.artist} ・ ${track.album}` : "--";
-  nowPlaying.querySelector(".track").textContent = title;
-  nowPlaying.querySelector(".meta").textContent = meta;
-};
-
 const formatTime = (seconds) => {
   if (!Number.isFinite(seconds)) {
     return "0:00";
@@ -81,12 +75,17 @@ const formatTime = (seconds) => {
 
 const updatePlayerButtons = () => {
   const label = playerState.isPlaying ? "一時停止" : "再生";
-  if (playerToggle) {
-    playerToggle.textContent = label;
-  }
-  if (miniToggle) {
-    miniToggle.textContent = label;
-  }
+  [playerToggle, miniToggle].forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.classList.toggle("is-playing", playerState.isPlaying);
+    button.setAttribute("aria-label", label);
+    const labelSpan = button.querySelector(".sr-only");
+    if (labelSpan) {
+      labelSpan.textContent = label;
+    }
+  });
 };
 
 const updatePlayerUI = () => {
@@ -95,7 +94,29 @@ const updatePlayerUI = () => {
   }
   const track = state.tracks[playerState.currentIndex];
   if (!track) {
-    renderNowPlaying(null);
+    if (playerCover) {
+      playerCover.src = "";
+      playerCover.alt = "";
+    }
+    if (playerTitle) {
+      playerTitle.textContent = "--";
+    }
+    if (playerArtist) {
+      playerArtist.textContent = "--";
+    }
+    if (playerAlbum) {
+      playerAlbum.textContent = "--";
+    }
+    if (miniCover) {
+      miniCover.src = "";
+      miniCover.alt = "";
+    }
+    if (miniTitle) {
+      miniTitle.textContent = "--";
+    }
+    if (miniArtist) {
+      miniArtist.textContent = "--";
+    }
     if (miniPlayer) {
       miniPlayer.classList.remove("is-active");
       miniPlayer.setAttribute("aria-hidden", "true");
@@ -114,7 +135,6 @@ const updatePlayerUI = () => {
     }
     return;
   }
-  renderNowPlaying(track);
   if (playerCover) {
     playerCover.src = track.cover || "";
     playerCover.alt = track.album || track.title;
@@ -184,6 +204,20 @@ const togglePlayback = async () => {
   } else {
     audioPlayer.pause();
   }
+};
+
+const stopPlayback = () => {
+  if (!audioPlayer) {
+    return;
+  }
+  audioPlayer.pause();
+  audioPlayer.currentTime = 0;
+  audioPlayer.removeAttribute("src");
+  audioPlayer.load();
+  playerState.currentIndex = -1;
+  playerState.isPlaying = false;
+  updatePlayerUI();
+  updatePlayerButtons();
 };
 
 const playNext = () => {
@@ -408,9 +442,7 @@ const init = async () => {
     renderTagOptions();
     updatePlayerUI();
     if (tracks.length === 0) {
-      renderNowPlaying(null);
-    } else {
-      renderNowPlaying(tracks[0]);
+      updatePlayerUI();
     }
 
     statusVersion.textContent = status.version;
@@ -510,6 +542,12 @@ if (playerNext) {
   });
 }
 
+if (playerStop) {
+  playerStop.addEventListener("click", () => {
+    stopPlayback();
+  });
+}
+
 if (miniPrev) {
   miniPrev.addEventListener("click", () => {
     playPrev();
@@ -519,6 +557,12 @@ if (miniPrev) {
 if (miniNext) {
   miniNext.addEventListener("click", () => {
     playNext();
+  });
+}
+
+if (miniStop) {
+  miniStop.addEventListener("click", () => {
+    stopPlayback();
   });
 }
 
@@ -533,14 +577,6 @@ if (playerClose) {
     if (playerOverlay) {
       playerOverlay.classList.remove("is-active");
       playerOverlay.setAttribute("aria-hidden", "true");
-    }
-  });
-}
-
-if (nowPlaying) {
-  nowPlaying.addEventListener("click", () => {
-    if (playerState.currentIndex >= 0) {
-      openPlayerOverlay();
     }
   });
 }
