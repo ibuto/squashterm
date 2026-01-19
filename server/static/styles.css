@@ -102,12 +102,13 @@ body {
 }
 
 .app-logo {
-  width: 48px;
   height: 48px;
+  width: auto;
+  max-width: 200px;
   border-radius: 12px;
-  object-fit: cover;
+  object-fit: contain;
   background: #0b1022;
-  padding: 6px;
+  padding: 6px 10px;
 }
 
 .app-header h2 {
