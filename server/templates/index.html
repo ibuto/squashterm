@@ -11,20 +11,20 @@
       <div class="layout">
         <aside class="sidebar">
           <div class="brand">
-            <p class="eyebrow">SquashTerm</p>
+            <img class="app-logo" src="/static/images/logo.png" alt="SquashTerm logo" />
           </div>
           <nav class="nav-menu" role="tablist">
             <button class="nav-button is-active" data-tab="media" role="tab">
-              <span class="label">メディア</span>
+              <span class="label">Media</span>
             </button>
             <button class="nav-button" data-tab="playlist" role="tab">
-              <span class="label">プレイリスト</span>
+              <span class="label">Playlists</span>
             </button>
             <button class="nav-button" data-tab="manage" role="tab">
-              <span class="label">楽曲管理</span>
+              <span class="label">Manage</span>
             </button>
             <button class="nav-button" data-tab="settings" role="tab">
-              <span class="label">設定</span>
+              <span class="label">Settings</span>
             </button>
           </nav>
         </aside>
@@ -33,31 +33,10 @@
           <header class="app-header">
             <div class="title-block">
               <div class="title-bar">
-                <img class="app-logo" src="/static/images/logo.png" alt="SquashTerm logo" />
                 <div>
-                  <h2>SquashTerm</h2>
-                  <p class="subheading">
-                    An open-source music terminal.
-                  </p>
+                  <img class="app-logo-sub" src="/static/images/logo.png" alt="SquashTerm logo" />
                 </div>
               </div>
-            </div>
-            <div class="status-card" id="status-card">
-              <p class="status-title">システムステータス</p>
-              <dl>
-                <div>
-                  <dt>バージョン</dt>
-                  <dd id="status-version">--</dd>
-                </div>
-                <div>
-                  <dt>デバイス</dt>
-                  <dd id="status-device">--</dd>
-                </div>
-                <div>
-                  <dt>時刻 (UTC)</dt>
-                  <dd id="status-time">--</dd>
-                </div>
-              </dl>
             </div>
           </header>
 
@@ -65,9 +44,9 @@
             <div class="panel-header">
               <div>
                 <h3>メディアライブラリ</h3>
-                <p>アルバムカバーとタグ情報をカード形式で表示。</p>
+                <p>登録されている曲一覧です。</p>
               </div>
-              <div class="now-playing" id="now-playing">
+              <div class="now-playing" id="now-playing"><!-- TODO: 消す -->
                 <p class="label">Now Playing</p>
                 <p class="track">--</p>
                 <p class="meta">--</p>
@@ -79,8 +58,8 @@
           <section class="panel" id="panel-playlist" role="tabpanel">
             <div class="panel-header">
               <div>
-                <h3>プレイリスト / お気に入り</h3>
-                <p>作成済みプレイリストとお気に入り楽曲を一覧。</p>
+                <h3>プレイリスト</h3>
+                <p>登録されているプレイリストです。</p>
               </div>
               <button class="primary">新規プレイリスト作成</button>
             </div>
@@ -148,7 +127,7 @@
             <div class="panel-header">
               <div>
                 <h3>設定</h3>
-                <p>端末情報、ストレージ、再生設定の概要。</p>
+                <p>設定項目を変更します。</p>
               </div>
               <button class="secondary">設定を保存</button>
             </div>

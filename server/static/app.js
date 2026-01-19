@@ -64,7 +64,7 @@ tabs.forEach((tab) => {
 });
 
 const renderNowPlaying = (track) => {
-  const title = track ? track.title : "空です。";
+  const title = track ? track.title : "項目が存在しません。";
   const meta = track ? `${track.artist} ・ ${track.album}` : "--";
   nowPlaying.querySelector(".track").textContent = title;
   nowPlaying.querySelector(".meta").textContent = meta;
@@ -212,7 +212,7 @@ const playPrev = () => {
 const renderMedia = () => {
   mediaGrid.innerHTML = "";
   if (state.tracks.length === 0) {
-    mediaGrid.innerHTML = '<div class="empty-state">空です。</div>';
+    mediaGrid.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
     return;
   }
   state.tracks.forEach((track) => {
@@ -246,7 +246,7 @@ const renderMedia = () => {
 const renderPlaylists = () => {
   playlistList.innerHTML = "";
   if (state.playlists.length === 0) {
-    playlistList.innerHTML = '<div class="empty-state">空です。</div>';
+    playlistList.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
     return;
   }
   state.playlists.forEach((playlist) => {
@@ -280,7 +280,7 @@ const renderFavorites = () => {
   if (favoriteTracks.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "空です。";
+    empty.textContent = "項目が存在しません。";
     favorites.appendChild(empty);
     return;
   }
@@ -305,7 +305,7 @@ const renderTagOptions = () => {
     return;
   }
   if (state.tracks.length === 0) {
-    tagSelect.innerHTML = '<option value="">空です。</option>';
+    tagSelect.innerHTML = '<option value="">項目が存在しません。</option>';
     return;
   }
   tagSelect.innerHTML = state.tracks
@@ -356,9 +356,11 @@ const appendImportLog = (message) => {
   if (!importLog) {
     return;
   }
+
+  // TODO: このような処理は許されないので修正する
   const maxLength = 3000;
   if (message.length > maxLength) {
-    importLog.textContent = `ログが長いため末尾のみ表示します。\n\n${message.slice(
+    importLog.textContent = `\n\n${message.slice(
       -maxLength
     )}`;
     return;
@@ -468,22 +470,17 @@ if (audioPlayer) {
 
 if (playerSeek && audioPlayer) {
   playerSeek.addEventListener("input", (event) => {
-    console.log("seek event")
     const value = Number(event.target.value);
     if (Number.isFinite(value) && audioPlayer.duration) {
       audioPlayer.currentTime = (value / 100) * audioPlayer.duration;
-      console.log("seek event")
     }
   });
 }
 
 if (miniSeek && audioPlayer) {
   miniSeek.addEventListener("input", (event) => {
-    console.log("miniseek event")
     const value = Number(event.target.value);
-    console.log(value)
     if (Number.isFinite(value) && audioPlayer.duration) {
-      console.log((value / 100) * audioPlayer.duration)
       audioPlayer.currentTime = Math.round((value / 100) * audioPlayer.duration);
     }
   });

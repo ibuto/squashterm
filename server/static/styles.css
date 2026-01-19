@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-  background: #0f172a;
+  background: #1d1d1d;
   color: #e2e8f0;
 }
 
@@ -11,7 +11,7 @@
 
 body {
   margin: 0;
-  background: #0f172a;
+  background: #1d1d1d;
 }
 
 .app {
@@ -26,7 +26,7 @@ body {
 }
 
 .sidebar {
-  background: #111827;
+  background: #111;
   border-radius: 20px;
   padding: 20px;
   display: flex;
@@ -58,7 +58,7 @@ body {
 
 .nav-button {
   border: 1px solid transparent;
-  background: #1e293b;
+  background: #333;
   color: #e2e8f0;
   padding: 12px 14px;
   border-radius: 14px;
@@ -107,8 +107,11 @@ body {
   max-width: 200px;
   border-radius: 12px;
   object-fit: contain;
-  background: #0b1022;
   padding: 6px 10px;
+}
+
+.app-logo-sub {
+  display: none;
 }
 
 .app-header h2 {
@@ -122,7 +125,7 @@ body {
 }
 
 .status-card {
-  background: #111827;
+  background: #111;
   border-radius: 16px;
   padding: 16px 20px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
@@ -150,7 +153,7 @@ body {
 
 .panel {
   display: none;
-  background: #111827;
+  background: #111;
   border-radius: 24px;
   padding: 24px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.45);
@@ -189,7 +192,7 @@ body {
 }
 
 .media-card {
-  background: #1f2937;
+  background: #222;
   border-radius: 18px;
   padding: 16px;
   display: grid;
@@ -233,12 +236,13 @@ body {
 }
 
 .play-button.is-disabled {
-  background: #1e293b;
+  background: #333;
   color: #94a3b8;
   cursor: not-allowed;
 }
 
 .now-playing {
+  display: none;
   background: rgba(37, 99, 235, 0.15);
   border-radius: 16px;
   padding: 12px 16px;
@@ -271,7 +275,7 @@ body {
 }
 
 .playlist-card {
-  background: #1f2937;
+  background: #222;
   border-radius: 18px;
   padding: 16px;
   display: grid;
@@ -283,7 +287,7 @@ body {
 }
 
 .favorites {
-  background: #1e293b;
+  background: #333;
   border-radius: 18px;
   padding: 16px;
   display: grid;
@@ -307,7 +311,7 @@ body {
 }
 
 .card {
-  background: #1f2937;
+  background: #222;
   border-radius: 18px;
   padding: 16px;
   display: grid;
@@ -331,7 +335,7 @@ select {
   border-radius: 10px;
   border: 1px solid #334155;
   font-size: 14px;
-  background: #0f172a;
+  background: #1d1d1d;
   color: #e2e8f0;
 }
 
@@ -357,7 +361,7 @@ select {
 }
 
 .secondary {
-  background: #1e293b;
+  background: #333;
   color: #e2e8f0;
   border: 1px solid #334155;
 }
@@ -386,7 +390,7 @@ select {
 
 .terminal-output {
   background: #0b1022;
-  border: 1px solid #1e293b;
+  border: 1px solid #333;
   border-radius: 12px;
   padding: 12px;
   color: #e2e8f0;
@@ -432,7 +436,7 @@ select {
 }
 
 .player-overlay-content {
-  background: #111827;
+  background: #111;
   border-radius: 24px;
   padding: 32px;
   max-width: 520px;
@@ -449,7 +453,7 @@ select {
   top: 16px;
   right: 16px;
   border: none;
-  background: #1e293b;
+  background: #333;
   color: #e2e8f0;
   border-radius: 999px;
   width: 36px;
@@ -499,7 +503,7 @@ select {
   left: 24px;
   right: 24px;
   bottom: 24px;
-  background: #111827;
+  background: #111;
   border-radius: 20px;
   padding: 12px 16px;
   display: grid;
@@ -586,6 +590,15 @@ select {
     display: none;
   }
 
+  .app-logo-sub {
+    display:inline;
+    height: 48px;
+    width: auto;
+    max-width: 200px;
+    border-radius: 12px;
+    object-fit: contain;
+    padding: 6px 10px;
+  }
   .nav-menu {
     flex-direction: row;
     gap: 12px;
