@@ -150,7 +150,11 @@
                   <span>アルバム</span>
                   <input type="text" id="tag-album" placeholder="アルバム名" />
                 </label>
-                <button type="button" class="secondary">変更内容を保存</button>
+                <label>
+                  <span>ソース URL</span>
+                  <input type="url" id="tag-source-url" placeholder="https://..." />
+                </label>
+                <button type="button" class="secondary" id="tag-save">変更内容を保存</button>
               </form>
             </div>
           </section>
@@ -374,17 +378,37 @@
                 <button type="button" role="menuitem" id="player-download">
                   ダウンロード
                 </button>
-                <div class="player-menu-section">
-                  <p class="player-menu-title">プレイリストに追加</p>
-                  <div class="player-menu-list" id="player-menu-playlists"></div>
-                </div>
-                <button type="button" role="menuitem">情報を編集</button>
+                <button type="button" role="menuitem" id="player-add-playlist">
+                  プレイリストに追加
+                </button>
+                <button type="button" role="menuitem" id="player-open-source">
+                  ソース URLを開く
+                </button>
+                <button type="button" role="menuitem" id="player-edit-info">情報を編集</button>
               </div>
             </div>
           </div>
         </div>
       </div>
     </section>
+
+    <div
+      class="modal-overlay"
+      id="playlist-modal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>プレイリストに追加</h3>
+          <button type="button" class="icon-button" id="playlist-modal-close" aria-label="閉じる">
+            ×
+          </button>
+        </div>
+        <div class="modal-body" id="playlist-modal-list"></div>
+      </div>
+    </div>
 
     <div class="mini-player" id="mini-player" aria-hidden="true">
       <div class="mini-info">

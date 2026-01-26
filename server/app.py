@@ -68,6 +68,7 @@ class Track:
     genre: str
     year: int
     file_url: str | None = None
+    source_url: str | None = None
 
 class ImportRequest(BaseModel):
     url: str
@@ -82,6 +83,12 @@ class PlaylistUpdate(BaseModel):
 
 class FavoritesUpdate(BaseModel):
     track_ids: list[str]
+
+class TrackUpdate(BaseModel):
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+    source_url: str | None = None
 
 # --- ヘルパー関数 (既存ロジックを流用) ---
 
@@ -108,7 +115,10 @@ def _parse_year(info: dict) -> int:
             return 0
     return 0
 
-def _parse_track_from_info(info: dict) -> Track:
+def _parse_track_from_info(info: dict, source_url: str | None = None) -> Track:
+    resolved_source_url = source_url
+    if not resolved_source_url:
+        resolved_source_url = info.get("webpage_url") or info.get("original_url")
     return Track(
         id=f"yt_{info.get('id', uuid.uuid4().hex)}",
         title=info.get("track") or info.get("title") or "Unknown Title",
@@ -119,6 +129,7 @@ def _parse_track_from_info(info: dict) -> Track:
         bpm=int(info.get("bpm") or 0),
         genre=info.get("genre") or "Unknown",
         year=_parse_year(info),
+        source_url=resolved_source_url,
     )
 
 def _resolve_thumbnail_path(info: dict) -> str | None:
@@ -215,6 +226,7 @@ def _fetch_tracks() -> list[Track]:
                 genre=row["genre"],
                 year=row["year"],
                 file_url=file_url,
+                source_url=row.get("source_url"),
             )
         )
     return tracks
@@ -369,19 +381,19 @@ def _iter_ytdlp_events(url: str):
     if not infos:
         yield {"type": "error", "message": "yt-dlp did not return metadata"}
         return
-    tracks = _store_downloaded_tracks(infos)
+    tracks = _store_downloaded_tracks(infos, url)
     yield {
         "type": "complete",
         "tracks": [asdict(track) for track in tracks],
     }
 
-def _store_downloaded_tracks(infos: list[dict]) -> list[Track]:
+def _store_downloaded_tracks(infos: list[dict], source_url: str | None = None) -> list[Track]:
     stored_tracks: list[Track] = []
     data = _load_library()
     tracks = data.setdefault("tracks", [])
     track_map = {track["id"]: track for track in tracks}
     for info in infos:
-        track = _parse_track_from_info(info)
+        track = _parse_track_from_info(info, source_url)
         resolved_cover = _resolve_thumbnail_path(info)
         if resolved_cover:
             track.cover = resolved_cover
@@ -395,13 +407,15 @@ def _store_downloaded_tracks(infos: list[dict]) -> list[Track]:
             track_entry = track_map[track.id]
             if resolved_cover and track_entry.get("cover") in ("", DEFAULT_COVER):
                 track_entry["cover"] = resolved_cover
+            if track.source_url and not track_entry.get("source_url"):
+                track_entry["source_url"] = track.source_url
         stored_tracks.append(track)
     _save_library(data)
     return stored_tracks
 
 def _ingest_from_url(url: str) -> tuple[list[Track], str]:
     infos, log_output = _download_with_ytdlp(url)
-    tracks = _store_downloaded_tracks(infos)
+    tracks = _store_downloaded_tracks(infos, url)
     return tracks, log_output
 
 # --- FastAPI アプリケーション定義 ---
@@ -427,6 +441,39 @@ async def read_index():
 def get_library():
     # データクラスを辞書化して返す
     return [asdict(track) for track in _fetch_tracks()]
+
+@app.put("/api/library/{track_id}")
+def update_track(track_id: str, payload: TrackUpdate):
+    data = _load_library()
+    tracks = data.get("tracks", [])
+    track = next((item for item in tracks if item.get("id") == track_id), None)
+    if track is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    if payload.title is not None:
+        track["title"] = payload.title
+    if payload.artist is not None:
+        track["artist"] = payload.artist
+    if payload.album is not None:
+        track["album"] = payload.album
+    if payload.source_url is not None:
+        track["source_url"] = payload.source_url
+    _save_library(data)
+    file_path = track.get("file_path")
+    file_url = f"/media/{Path(file_path).name}" if file_path else None
+    updated = Track(
+        id=track["id"],
+        title=track["title"],
+        artist=track["artist"],
+        album=track["album"],
+        cover=track["cover"],
+        duration=track["duration"],
+        bpm=track["bpm"],
+        genre=track["genre"],
+        year=track["year"],
+        file_url=file_url,
+        source_url=track.get("source_url"),
+    )
+    return asdict(updated)
 
 @app.get("/api/playlists")
 def get_playlists():
