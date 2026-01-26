@@ -35,6 +35,9 @@ const playerToggle = document.getElementById("player-toggle");
 const playerPrev = document.getElementById("player-prev");
 const playerNext = document.getElementById("player-next");
 const playerStop = document.getElementById("player-stop");
+const playerFavorite = document.getElementById("player-favorite");
+const playerMenuToggle = document.getElementById("player-menu-toggle");
+const playerMenuPanel = document.getElementById("player-menu-panel");
 const playerSeek = document.getElementById("player-seek");
 const playerCurrent = document.getElementById("player-current");
 const playerDuration = document.getElementById("player-duration");
@@ -47,6 +50,7 @@ const miniToggle = document.getElementById("mini-toggle");
 const miniPrev = document.getElementById("mini-prev");
 const miniNext = document.getElementById("mini-next");
 const miniStop = document.getElementById("mini-stop");
+const miniFavorite = document.getElementById("mini-favorite");
 const miniExpand = document.getElementById("mini-expand");
 const miniSeek = document.getElementById("mini-seek");
 const miniCurrent = document.getElementById("mini-current");
@@ -104,6 +108,57 @@ const updatePlayerButtons = () => {
     }
   });
   updateMediaPlayingIndicator();
+};
+
+const updateFavoriteButtons = () => {
+  const track = state.tracks[playerState.currentIndex];
+  const isFavorite = track ? state.favorites.includes(track.id) : false;
+  const label = isFavorite ? "お気に入りから削除" : "お気に入りに追加";
+  [playerFavorite, miniFavorite].forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.classList.toggle("is-active", isFavorite);
+    button.setAttribute("aria-pressed", isFavorite ? "true" : "false");
+    button.setAttribute("aria-label", label);
+    const labelSpan = button.querySelector(".sr-only");
+    if (labelSpan) {
+      labelSpan.textContent = label;
+    }
+  });
+};
+
+const toggleFavorite = () => {
+  const track = state.tracks[playerState.currentIndex];
+  if (!track) {
+    return;
+  }
+  const currentIndex = state.favorites.indexOf(track.id);
+  if (currentIndex >= 0) {
+    state.favorites.splice(currentIndex, 1);
+  } else {
+    state.favorites.push(track.id);
+  }
+  renderFavorites();
+  updateFavoriteButtons();
+};
+
+const closePlayerMenu = () => {
+  if (!playerMenuPanel || !playerMenuToggle) {
+    return;
+  }
+  playerMenuPanel.classList.remove("is-open");
+  playerMenuPanel.setAttribute("aria-hidden", "true");
+  playerMenuToggle.setAttribute("aria-expanded", "false");
+};
+
+const togglePlayerMenu = () => {
+  if (!playerMenuPanel || !playerMenuToggle) {
+    return;
+  }
+  const isOpen = playerMenuPanel.classList.toggle("is-open");
+  playerMenuPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  playerMenuToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
 };
 
 const setTagFields = (track) => {
@@ -240,6 +295,7 @@ const updatePlayerUI = () => {
   updatePlayerButtons();
   updateMediaSessionMetadata(track);
   updateMediaPlayingIndicator();
+  updateFavoriteButtons();
 };
 
 const openPlayerOverlay = () => {
@@ -249,6 +305,7 @@ const openPlayerOverlay = () => {
   }
   updatePlayerUI();
   updatePlayerButtons();
+  updateFavoriteButtons();
 };
 
 const setTrackByIndex = (index) => {
@@ -623,6 +680,7 @@ const refreshLibrary = async () => {
   renderFavorites();
   renderTagOptions();
   updatePlayerUI();
+  updateFavoriteButtons();
 };
 
 const appendImportLog = (message) => {
@@ -684,6 +742,7 @@ const init = async () => {
     renderFavorites();
     renderTagOptions();
     updatePlayerUI();
+    updateFavoriteButtons();
     if (tracks.length === 0) {
       updatePlayerUI();
     }
@@ -824,6 +883,18 @@ if (playerStop) {
   });
 }
 
+if (playerFavorite) {
+  playerFavorite.addEventListener("click", () => {
+    toggleFavorite();
+  });
+}
+
+if (miniFavorite) {
+  miniFavorite.addEventListener("click", () => {
+    toggleFavorite();
+  });
+}
+
 if (miniPrev) {
   miniPrev.addEventListener("click", () => {
     playPrev();
@@ -854,8 +925,38 @@ if (playerClose) {
       playerOverlay.classList.remove("is-active");
       playerOverlay.setAttribute("aria-hidden", "true");
     }
+    closePlayerMenu();
   });
 }
+
+if (playerMenuToggle) {
+  playerMenuToggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    togglePlayerMenu();
+  });
+}
+
+if (playerMenuPanel) {
+  playerMenuPanel.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target && target.matches("button")) {
+      closePlayerMenu();
+    }
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (!playerMenuPanel || !playerMenuToggle) {
+    return;
+  }
+  if (
+    playerMenuPanel.classList.contains("is-open") &&
+    !playerMenuPanel.contains(event.target) &&
+    !playerMenuToggle.contains(event.target)
+  ) {
+    closePlayerMenu();
+  }
+});
 
 if (supportsMediaSession) {
   navigator.mediaSession.setActionHandler("play", () => {

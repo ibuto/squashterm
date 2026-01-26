@@ -565,6 +565,12 @@ select {
   color: #94a3b8;
 }
 
+.player-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .player-controls {
   display: flex;
   gap: 12px;
@@ -573,6 +579,7 @@ select {
   position: relative;
   z-index: 2;
   margin-top: 4px;
+  flex: 1;
 }
 
 .player-progress {
@@ -617,6 +624,59 @@ select {
 .icon-button.is-primary {
   background: #2563eb;
   color: #ffffff;
+}
+
+.icon-button.is-favorite.is-active {
+  background: rgba(244, 63, 94, 0.25);
+  color: #fda4af;
+}
+
+.player-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.player-menu-toggle {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.player-menu-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  min-width: 180px;
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 12px;
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.player-menu-panel.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.player-menu-panel button {
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.player-menu-panel button:hover {
+  background: rgba(37, 99, 235, 0.35);
 }
 
 .toggle-button .icon-pause {

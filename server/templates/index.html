@@ -179,42 +179,80 @@
             <input type="range" id="player-seek" min="0" max="100" value="0" />
             <span id="player-duration">0:00</span>
           </div>
-          <div class="player-controls">
-            <button class="icon-button" type="button" id="player-prev" aria-label="前へ">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="4" y="5" width="3" height="14" rx="1.5" />
-                <polygon points="20,5 10,12 20,19" />
-              </svg>
-              <span class="sr-only">前へ</span>
-            </button>
-            <button
-              class="icon-button is-primary toggle-button"
-              type="button"
-              id="player-toggle"
-              aria-label="再生"
-            >
-              <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
-                <polygon points="8,5 19,12 8,19" />
-              </svg>
-              <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="7" y="5" width="4" height="14" rx="1.5" />
-                <rect x="13" y="5" width="4" height="14" rx="1.5" />
-              </svg>
-              <span class="sr-only">再生</span>
-            </button>
-            <button class="icon-button" type="button" id="player-next" aria-label="次へ">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <polygon points="4,5 14,12 4,19" />
-                <rect x="17" y="5" width="3" height="14" rx="1.5" />
-              </svg>
-              <span class="sr-only">次へ</span>
-            </button>
-            <button class="icon-button" type="button" id="player-stop" aria-label="停止">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="7" y="7" width="10" height="10" rx="2" />
-              </svg>
-              <span class="sr-only">停止</span>
-            </button>
+          <div class="player-controls-row">
+            <div class="player-controls">
+              <button class="icon-button" type="button" id="player-prev" aria-label="前へ">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="4" y="5" width="3" height="14" rx="1.5" />
+                  <polygon points="20,5 10,12 20,19" />
+                </svg>
+                <span class="sr-only">前へ</span>
+              </button>
+              <button
+                class="icon-button is-primary toggle-button"
+                type="button"
+                id="player-toggle"
+                aria-label="再生"
+              >
+                <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
+                  <polygon points="8,5 19,12 8,19" />
+                </svg>
+                <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="7" y="5" width="4" height="14" rx="1.5" />
+                  <rect x="13" y="5" width="4" height="14" rx="1.5" />
+                </svg>
+                <span class="sr-only">再生</span>
+              </button>
+              <button class="icon-button" type="button" id="player-next" aria-label="次へ">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <polygon points="4,5 14,12 4,19" />
+                  <rect x="17" y="5" width="3" height="14" rx="1.5" />
+                </svg>
+                <span class="sr-only">次へ</span>
+              </button>
+              <button class="icon-button" type="button" id="player-stop" aria-label="停止">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="7" y="7" width="10" height="10" rx="2" />
+                </svg>
+                <span class="sr-only">停止</span>
+              </button>
+              <button
+                class="icon-button is-favorite"
+                type="button"
+                id="player-favorite"
+                aria-label="お気に入りに追加"
+                aria-pressed="false"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 20.5l-1.6-1.45c-4.8-4.35-7.9-7.1-7.9-10.35 0-2.15 1.7-3.85 3.85-3.85 1.45 0 2.85 0.7 3.65 1.8 0.8-1.1 2.2-1.8 3.65-1.8 2.15 0 3.85 1.7 3.85 3.85 0 3.25-3.1 6-7.9 10.35L12 20.5z"
+                  />
+                </svg>
+                <span class="sr-only">お気に入りに追加</span>
+              </button>
+            </div>
+            <div class="player-menu">
+              <button
+                class="icon-button player-menu-toggle"
+                type="button"
+                id="player-menu-toggle"
+                aria-label="メニューを開く"
+                aria-expanded="false"
+                aria-haspopup="true"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="5" cy="12" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="19" cy="12" r="2" />
+                </svg>
+                <span class="sr-only">メニュー</span>
+              </button>
+              <div class="player-menu-panel" id="player-menu-panel" role="menu" aria-hidden="true">
+                <button type="button" role="menuitem">ダウンロード</button>
+                <button type="button" role="menuitem">プレイリストに追加</button>
+                <button type="button" role="menuitem">情報を編集</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -263,6 +301,20 @@
             <rect x="7" y="7" width="10" height="10" rx="2" />
           </svg>
           <span class="sr-only">停止</span>
+        </button>
+        <button
+          class="icon-button is-favorite"
+          type="button"
+          id="mini-favorite"
+          aria-label="お気に入りに追加"
+          aria-pressed="false"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 20.5l-1.6-1.45c-4.8-4.35-7.9-7.1-7.9-10.35 0-2.15 1.7-3.85 3.85-3.85 1.45 0 2.85 0.7 3.65 1.8 0.8-1.1 2.2-1.8 3.65-1.8 2.15 0 3.85 1.7 3.85 3.85 0 3.25-3.1 6-7.9 10.35L12 20.5z"
+            />
+          </svg>
+          <span class="sr-only">お気に入りに追加</span>
         </button>
         <button class="icon-button" type="button" id="mini-expand" aria-label="画面を開く">
           <svg viewBox="0 0 24 24" aria-hidden="true">
