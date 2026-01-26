@@ -2,6 +2,7 @@ const tabs = document.querySelectorAll(".nav-button");
 const panels = document.querySelectorAll(".panel");
 
 const mediaGrid = document.getElementById("media-grid");
+const mediaViewToggle = document.getElementById("media-view-toggle");
 const playlistList = document.getElementById("playlist-list");
 const favorites = document.getElementById("favorites");
 const tagSelect = document.getElementById("tag-track-select");
@@ -62,6 +63,10 @@ const playerState = {
   isPlaying: false,
 };
 
+const mediaViewState = {
+  mode: "grid",
+};
+
 const supportsMediaSession = "mediaSession" in navigator;
 
 tabs.forEach((tab) => {
@@ -98,6 +103,7 @@ const updatePlayerButtons = () => {
       labelSpan.textContent = label;
     }
   });
+  updateMediaPlayingIndicator();
 };
 
 const setTagFields = (track) => {
@@ -122,6 +128,28 @@ const setTagFields = (track) => {
   if (tagAlbumInput) {
     tagAlbumInput.value = track.album;
   }
+};
+
+const updateMediaViewToggle = () => {
+  if (!mediaViewToggle) {
+    return;
+  }
+  const isList = mediaViewState.mode === "list";
+  mediaViewToggle.textContent = isList ? "アルバム表示" : "リスト表示";
+  mediaViewToggle.setAttribute("aria-pressed", isList ? "true" : "false");
+};
+
+const updateMediaPlayingIndicator = () => {
+  const rows = document.querySelectorAll(".media-list-row");
+  if (!rows.length) {
+    return;
+  }
+  const currentTrack = state.tracks[playerState.currentIndex];
+  rows.forEach((row) => {
+    const isCurrent =
+      currentTrack && String(row.dataset.trackId) === String(currentTrack.id);
+    row.classList.toggle("is-playing", Boolean(isCurrent && playerState.isPlaying));
+  });
 };
 
 const updatePlayerUI = () => {
@@ -179,6 +207,7 @@ const updatePlayerUI = () => {
       navigator.mediaSession.metadata = null;
       navigator.mediaSession.playbackState = "none";
     }
+    updateMediaPlayingIndicator();
     return;
   }
   if (playerCover) {
@@ -210,6 +239,7 @@ const updatePlayerUI = () => {
   }
   updatePlayerButtons();
   updateMediaSessionMetadata(track);
+  updateMediaPlayingIndicator();
 };
 
 const openPlayerOverlay = () => {
@@ -294,8 +324,61 @@ const playPrev = () => {
 
 const renderMedia = () => {
   mediaGrid.innerHTML = "";
+  if (mediaViewState.mode === "list") {
+    mediaGrid.classList.add("is-list");
+  } else {
+    mediaGrid.classList.remove("is-list");
+  }
   if (state.tracks.length === 0) {
     mediaGrid.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
+    return;
+  }
+  if (mediaViewState.mode === "list") {
+    const list = document.createElement("div");
+    list.className = "media-list";
+    list.innerHTML = `
+      <div class="media-list-header">
+        <span></span>
+        <span>アート</span>
+        <span>タイトル</span>
+        <span>アーティスト</span>
+        <span>再生時間</span>
+      </div>
+    `;
+    state.tracks.forEach((track) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "media-list-row";
+      row.dataset.trackId = track.id;
+      const hasAudio = Boolean(track.file_url);
+      row.disabled = !hasAudio;
+      if (!hasAudio) {
+        row.classList.add("is-disabled");
+      }
+      row.innerHTML = `
+        <span class="media-list-status" aria-hidden="true">
+          <svg class="media-playing-icon" viewBox="0 0 24 24">
+            <polygon points="8,5 19,12 8,19" />
+          </svg>
+        </span>
+        <img class="media-list-cover" src="${track.cover}" alt="${track.album}" />
+        <span class="media-list-title">${track.title}</span>
+        <span class="media-list-artist">${track.artist}</span>
+        <span class="media-list-duration">${track.duration}</span>
+      `;
+      if (hasAudio) {
+        row.addEventListener("click", () => {
+          const index = state.tracks.findIndex((item) => item.id === track.id);
+          if (index >= 0) {
+            setTrackByIndex(index);
+            togglePlayback();
+          }
+        });
+      }
+      list.appendChild(row);
+    });
+    mediaGrid.appendChild(list);
+    updateMediaPlayingIndicator();
     return;
   }
   state.tracks.forEach((track) => {
@@ -535,6 +618,7 @@ const refreshLibrary = async () => {
   state.playlists = playlists;
   state.favorites = favoritesData;
   renderMedia();
+  updateMediaViewToggle();
   renderPlaylists();
   renderFavorites();
   renderTagOptions();
@@ -595,6 +679,7 @@ const init = async () => {
     state.favorites = favoritesData;
 
     renderMedia();
+    updateMediaViewToggle();
     renderPlaylists();
     renderFavorites();
     renderTagOptions();
@@ -638,6 +723,14 @@ if (tagSelect) {
       (track) => String(track.id) === String(tagSelect.value)
     );
     setTagFields(selectedTrack);
+  });
+}
+
+if (mediaViewToggle) {
+  mediaViewToggle.addEventListener("click", () => {
+    mediaViewState.mode = mediaViewState.mode === "list" ? "grid" : "list";
+    updateMediaViewToggle();
+    renderMedia();
   });
 }
 

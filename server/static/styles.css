@@ -185,6 +185,16 @@ body {
   gap: 20px;
 }
 
+.media-grid.is-list {
+  display: block;
+}
+
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .empty-state {
   padding: 24px;
   border-radius: 16px;
@@ -225,6 +235,87 @@ body {
   justify-content: space-between;
   font-size: 12px;
   color: #94a3b8;
+}
+
+.media-list {
+  display: grid;
+  gap: 10px;
+}
+
+.media-list-header,
+.media-list-row {
+  display: grid;
+  grid-template-columns: 24px 48px 2fr 1.5fr 80px;
+  align-items: center;
+  gap: 12px;
+}
+
+.media-list-header {
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 12px;
+}
+
+.media-list-row {
+  background: #222;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
+  cursor: pointer;
+  transition: border 0.2s ease, background 0.2s ease;
+}
+
+.media-list-row:hover {
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.media-list-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.media-list-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.media-list-title {
+  font-weight: 600;
+}
+
+.media-list-artist {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.media-list-duration {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.media-list-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-playing-icon {
+  width: 16px;
+  height: 16px;
+  fill: #38bdf8;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.media-list-row.is-playing .media-playing-icon {
+  opacity: 1;
 }
 
 .play-button {
@@ -754,5 +845,24 @@ select {
 
   .player-bottom {
     padding: 24px;
+  }
+
+  .media-list-header,
+  .media-list-row {
+    grid-template-columns: 20px 40px 1.4fr 1fr 60px;
+    gap: 8px;
+  }
+
+  .media-list-header {
+    font-size: 11px;
+  }
+
+  .media-list-title {
+    font-size: 13px;
+  }
+
+  .media-list-artist,
+  .media-list-duration {
+    font-size: 11px;
   }
 }
