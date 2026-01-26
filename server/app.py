@@ -7,10 +7,13 @@ import platform
 import re
 import shutil
 import subprocess
+import threading
+import time
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 # --- 新しいライブラリのインポート ---
 from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form
@@ -29,6 +32,8 @@ MEDIA_DIR = DATA_DIR / "media"
 LIBRARY_PATH = DATA_DIR / "library.json"
 SETTINGS_PATH = CONFIG_DIR / "settings.json"
 DEFAULT_COVER = "/static/images/cover-rise-up.svg"
+AUTO_SYNC_POLL_SECONDS = 60
+AUTO_SYNC_LOCK = threading.Lock()
 
 DEFAULT_SETTINGS = {
     "app": {
@@ -80,10 +85,16 @@ class ImportRequest(BaseModel):
 class PlaylistCreate(BaseModel):
     name: str
     track_ids: list[str] = []
+    auto_sync_url: str | None = None
+    auto_sync_interval_minutes: int | None = None
+    auto_sync_enabled: bool | None = None
 
 class PlaylistUpdate(BaseModel):
     name: str | None = None
     track_ids: list[str] | None = None
+    auto_sync_url: str | None = None
+    auto_sync_interval_minutes: int | None = None
+    auto_sync_enabled: bool | None = None
 
 class FavoritesUpdate(BaseModel):
     track_ids: list[str]
@@ -142,6 +153,188 @@ def _parse_bool(value: str | bool | None, default: bool = False) -> bool:
     if value is None:
         return default
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+def _parse_positive_int(value: int | str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+def _normalize_source_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    stripped = url.strip()
+    if not stripped:
+        return None
+    parsed = urlparse(stripped)
+    if not parsed.scheme:
+        return stripped
+    netloc = parsed.netloc.lower()
+    if "youtube.com" in netloc or "youtu.be" in netloc:
+        video_id = None
+        if "youtu.be" in netloc:
+            parts = [part for part in parsed.path.split("/") if part]
+            if parts:
+                video_id = parts[0]
+        if not video_id and parsed.path.startswith("/watch"):
+            query = parse_qs(parsed.query)
+            video_id = (query.get("v") or [None])[0]
+        if not video_id and parsed.path.startswith("/shorts/"):
+            parts = [part for part in parsed.path.split("/") if part]
+            if len(parts) >= 2:
+                video_id = parts[1]
+        if not video_id and parsed.path.startswith("/embed/"):
+            parts = [part for part in parsed.path.split("/") if part]
+            if len(parts) >= 2:
+                video_id = parts[1]
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
+    sanitized = parsed._replace(fragment="")
+    return urlunparse(sanitized)
+
+def _entry_to_source_url(entry: dict) -> str | None:
+    url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+    if not isinstance(url, str) or not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    ie_key = str(entry.get("ie_key") or "").lower()
+    if ie_key in {"youtube", "youtubeweb"}:
+        return f"https://www.youtube.com/watch?v={url}"
+    return url
+
+def _fetch_flat_playlist_entries(url: str) -> list[dict]:
+    command = ["yt-dlp", "--flat-playlist", "--print-json", url]
+    result = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        error_output = "\n".join(
+            line for line in [result.stdout.strip(), result.stderr.strip()] if line
+        )
+        raise RuntimeError(error_output or "yt-dlp failed")
+    entries = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            entries.append(parsed)
+    return entries
+
+def _collect_playlist_source_urls(playlist: dict, data: dict) -> set[str]:
+    track_ids = playlist.get("track_ids", [])
+    track_map = {track["id"]: track for track in data.get("tracks", [])}
+    urls = set()
+    for track_id in track_ids:
+        track = track_map.get(track_id)
+        if not track:
+            continue
+        normalized = _normalize_source_url(track.get("source_url"))
+        if normalized:
+            urls.add(normalized)
+    return urls
+
+def _sync_playlist_with_remote(playlist_id: str) -> dict:
+    data = _load_library()
+    playlists = data.get("playlists", [])
+    playlist = next((item for item in playlists if item.get("id") == playlist_id), None)
+    if not playlist:
+        raise RuntimeError("Playlist not found")
+    auto_sync_url = playlist.get("auto_sync_url")
+    if not auto_sync_url:
+        raise RuntimeError("Auto sync URL is missing")
+    entries = _fetch_flat_playlist_entries(auto_sync_url)
+    entry_urls = []
+    for entry in entries:
+        candidate = _entry_to_source_url(entry)
+        normalized = _normalize_source_url(candidate)
+        if normalized:
+            entry_urls.append(normalized)
+    existing_urls = _collect_playlist_source_urls(playlist, data)
+    missing_urls = [url for url in entry_urls if url not in existing_urls]
+    added_tracks: list[Track] = []
+    errors: list[str] = []
+    for url in missing_urls:
+        try:
+            tracks, _ = _ingest_from_url(url, playlist_id)
+            added_tracks.extend(tracks)
+        except Exception as exc:
+            errors.append(f"{url}: {exc}")
+    latest_data = _load_library()
+    latest_playlists = latest_data.get("playlists", [])
+    latest_playlist = next(
+        (item for item in latest_playlists if item.get("id") == playlist_id), None
+    )
+    if latest_playlist is not None:
+        latest_playlist["auto_sync_last_run"] = datetime.utcnow().isoformat(timespec="seconds")
+        latest_playlist["auto_sync_last_error"] = "\n".join(errors)
+        _save_library(latest_data)
+    return {
+        "missing_count": len(missing_urls),
+        "added_count": len(added_tracks),
+        "added_tracks": [asdict(track) for track in added_tracks],
+        "errors": errors,
+    }
+
+def _should_auto_sync_playlist(playlist: dict, now: datetime) -> bool:
+    auto_sync_url = playlist.get("auto_sync_url")
+    if not auto_sync_url:
+        return False
+    interval = _parse_positive_int(playlist.get("auto_sync_interval_minutes"))
+    if not interval:
+        return False
+    if playlist.get("auto_sync_enabled") is False:
+        return False
+    last_run = playlist.get("auto_sync_last_run")
+    if not last_run:
+        return True
+    try:
+        last_run_time = datetime.fromisoformat(last_run)
+    except ValueError:
+        return True
+    elapsed_minutes = (now - last_run_time).total_seconds() / 60
+    return elapsed_minutes >= interval
+
+def _run_due_auto_sync() -> None:
+    now = datetime.utcnow()
+    data = _load_library()
+    playlists = data.get("playlists", [])
+    due_ids = [
+        playlist.get("id")
+        for playlist in playlists
+        if playlist.get("id") and _should_auto_sync_playlist(playlist, now)
+    ]
+    if not due_ids:
+        return
+    for playlist_id in due_ids:
+        try:
+            _sync_playlist_with_remote(playlist_id)
+        except Exception:
+            continue
+
+def _auto_sync_worker() -> None:
+    while True:
+        time.sleep(AUTO_SYNC_POLL_SECONDS)
+        if AUTO_SYNC_LOCK.locked():
+            continue
+        with AUTO_SYNC_LOCK:
+            try:
+                _run_due_auto_sync()
+            except Exception:
+                continue
 
 def _load_mutagen() -> tuple[object | None, object | None]:
     if importlib.util.find_spec("mutagen") is None:
@@ -529,6 +722,11 @@ _init_settings()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
+@app.on_event("startup")
+def start_auto_sync_thread() -> None:
+    thread = threading.Thread(target=_auto_sync_worker, daemon=True)
+    thread.start()
+
 @app.get("/")
 @app.get("/index.html")
 async def read_index():
@@ -582,10 +780,20 @@ def get_playlists():
 def create_playlist(payload: PlaylistCreate):
     data = _load_library()
     playlists = data.setdefault("playlists", [])
+    auto_sync_interval = _parse_positive_int(payload.auto_sync_interval_minutes)
+    auto_sync_url = payload.auto_sync_url.strip() if payload.auto_sync_url else None
+    auto_sync_enabled = payload.auto_sync_enabled
+    if auto_sync_enabled is None:
+        auto_sync_enabled = bool(auto_sync_url and auto_sync_interval)
     playlist = {
         "id": f"pl_{uuid.uuid4().hex}",
         "name": payload.name,
         "track_ids": payload.track_ids,
+        "auto_sync_url": auto_sync_url,
+        "auto_sync_interval_minutes": auto_sync_interval,
+        "auto_sync_enabled": auto_sync_enabled,
+        "auto_sync_last_run": None,
+        "auto_sync_last_error": "",
     }
     playlists.append(playlist)
     _save_library(data)
@@ -602,8 +810,33 @@ def update_playlist(playlist_id: str, payload: PlaylistUpdate):
         playlist["name"] = payload.name
     if payload.track_ids is not None:
         playlist["track_ids"] = payload.track_ids
+    if payload.auto_sync_url is not None:
+        auto_sync_url = payload.auto_sync_url.strip() if payload.auto_sync_url else None
+        playlist["auto_sync_url"] = auto_sync_url
+        if not auto_sync_url:
+            playlist["auto_sync_enabled"] = False
+            playlist["auto_sync_last_run"] = None
+            playlist["auto_sync_last_error"] = ""
+    if payload.auto_sync_interval_minutes is not None:
+        playlist["auto_sync_interval_minutes"] = _parse_positive_int(
+            payload.auto_sync_interval_minutes
+        )
+    if payload.auto_sync_enabled is not None:
+        playlist["auto_sync_enabled"] = payload.auto_sync_enabled
     _save_library(data)
     return playlist
+
+@app.post("/api/playlists/{playlist_id}/sync")
+def sync_playlist(playlist_id: str):
+    try:
+        with AUTO_SYNC_LOCK:
+            return _sync_playlist_with_remote(playlist_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=400, detail="yt-dlp is not installed")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @app.get("/api/favorites")
 def get_favorites():

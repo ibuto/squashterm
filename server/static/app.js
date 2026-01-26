@@ -699,6 +699,114 @@ const buildPlaylistTrackRow = (track, listType) => {
   return row;
 };
 
+const formatSyncStatus = (playlist) => {
+  if (!playlist?.auto_sync_last_run) {
+    return "まだ同期されていません。";
+  }
+  const errorText = playlist.auto_sync_last_error
+    ? `（エラー: ${playlist.auto_sync_last_error.split("\n")[0]}）`
+    : "";
+  return `最終同期: ${playlist.auto_sync_last_run} ${errorText}`.trim();
+};
+
+const buildPlaylistSyncCard = (playlist) => {
+  const card = document.createElement("div");
+  card.className = "card playlist-sync-card";
+  card.innerHTML = `
+    <h4>プレイリスト自動同期</h4>
+    <p class="playlist-sync-lead">
+      外部プレイリストとの差分を定期的にチェックして追加曲を取り込みます。
+    </p>
+    <label>
+      <span>同期先プレイリスト URL</span>
+      <input type="url" class="playlist-sync-url" placeholder="https://www.youtube.com/playlist?list=..." />
+    </label>
+    <label>
+      <span>同期間隔（分）</span>
+      <input type="number" class="playlist-sync-interval" min="1" step="1" placeholder="60" />
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" class="playlist-sync-enabled" />
+      <span>自動同期を有効にする</span>
+    </label>
+    <div class="playlist-sync-actions">
+      <button type="button" class="secondary playlist-sync-save">設定を保存</button>
+      <button type="button" class="primary playlist-sync-run">手動で同期する</button>
+    </div>
+    <p class="playlist-sync-status"></p>
+  `;
+  const urlInput = card.querySelector(".playlist-sync-url");
+  const intervalInput = card.querySelector(".playlist-sync-interval");
+  const enabledInput = card.querySelector(".playlist-sync-enabled");
+  const saveButton = card.querySelector(".playlist-sync-save");
+  const runButton = card.querySelector(".playlist-sync-run");
+  const statusLabel = card.querySelector(".playlist-sync-status");
+
+  if (urlInput) {
+    urlInput.value = playlist.auto_sync_url || "";
+  }
+  if (intervalInput) {
+    intervalInput.value = playlist.auto_sync_interval_minutes || "";
+  }
+  if (enabledInput) {
+    const enabled =
+      playlist.auto_sync_enabled ?? Boolean(playlist.auto_sync_url);
+    enabledInput.checked = Boolean(enabled);
+  }
+  if (runButton) {
+    runButton.hidden = !playlist.auto_sync_url;
+  }
+  if (statusLabel) {
+    statusLabel.textContent = formatSyncStatus(playlist);
+  }
+  if (saveButton) {
+    saveButton.addEventListener("click", async () => {
+      if (!urlInput || !intervalInput || !enabledInput) {
+        return;
+      }
+      const autoSyncUrl = urlInput.value.trim();
+      const intervalValue = intervalInput.value.trim();
+      const parsedInterval = intervalValue ? Number(intervalValue) : null;
+      const payload = {
+        auto_sync_url: autoSyncUrl || null,
+        auto_sync_interval_minutes: Number.isFinite(parsedInterval)
+          ? parsedInterval
+          : null,
+        auto_sync_enabled: autoSyncUrl ? Boolean(enabledInput.checked) : false,
+      };
+      try {
+        const updated = await updatePlaylistSettings(playlist.id, payload);
+        const targetIndex = state.playlists.findIndex(
+          (item) => item.id === updated.id
+        );
+        if (targetIndex >= 0) {
+          state.playlists[targetIndex] = updated;
+        }
+        renderPlaylists();
+        renderPlaylistDetail();
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  }
+  if (runButton) {
+    runButton.addEventListener("click", async () => {
+      if (statusLabel) {
+        statusLabel.textContent = "同期中...";
+      }
+      try {
+        await syncPlaylistNow(playlist.id);
+        await refreshLibrary();
+      } catch (error) {
+        if (statusLabel) {
+          statusLabel.textContent = `同期に失敗しました: ${error.message}`;
+        }
+      }
+    });
+  }
+  return card;
+};
+
 const renderPlaylistDetail = () => {
   if (!playlistDetailBody || !playlistDetailTitle || !playlistDetailDesc) {
     return;
@@ -713,6 +821,9 @@ const renderPlaylistDetail = () => {
   }
   playlistDetailTitle.textContent = selected.name;
   playlistDetailDesc.textContent = `収録曲数: ${selected.track_ids.length}`;
+  if (selected.id !== "favorites") {
+    playlistDetailBody.appendChild(buildPlaylistSyncCard(selected));
+  }
   const visibleTrackIds = selected.track_ids.filter((trackId) => {
     const track = state.tracks.find((item) => item.id === trackId);
     if (!track) {
@@ -726,7 +837,10 @@ const renderPlaylistDetail = () => {
     return target.includes(query);
   });
   if (visibleTrackIds.length === 0) {
-    playlistDetailBody.innerHTML = '<div class="empty-state">該当する曲がありません。</div>';
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "該当する曲がありません。";
+    playlistDetailBody.appendChild(empty);
     return;
   }
   const list = document.createElement("div");
@@ -929,6 +1043,14 @@ const reorderTrackIds = (trackIds, draggedId, targetId) => {
 
 const updatePlaylistTracks = async (playlistId, trackIds) => {
   await requestJson(`/api/playlists/${playlistId}`, { track_ids: trackIds }, "PUT");
+};
+
+const updatePlaylistSettings = async (playlistId, payload) => {
+  return requestJson(`/api/playlists/${playlistId}`, payload, "PUT");
+};
+
+const syncPlaylistNow = async (playlistId) => {
+  return requestJson(`/api/playlists/${playlistId}/sync`, null, "POST");
 };
 
 const updateFavoritesTracks = async (trackIds) => {

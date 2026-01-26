@@ -446,6 +446,30 @@ body {
   min-height: 240px;
 }
 
+.playlist-sync-card {
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: #1f1f1f;
+}
+
+.playlist-sync-lead {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.playlist-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.playlist-sync-status {
+  margin: 0;
+  color: #cbd5f5;
+  font-size: 12px;
+}
+
 .playlist-detail-header h4 {
   margin: 0 0 6px;
   font-size: 18px;
