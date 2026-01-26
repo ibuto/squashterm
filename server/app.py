@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import platform
+import re
 import shutil
 import subprocess
 import uuid
@@ -11,7 +12,7 @@ from pathlib import Path
 
 # --- 新しいライブラリのインポート ---
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
@@ -303,6 +304,77 @@ def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
         raise RuntimeError("yt-dlp did not return metadata")
     return infos, log_output
 
+def _build_ytdlp_command(url: str) -> list[str]:
+    return [
+        "yt-dlp",
+        "--newline",
+        "--progress",
+        "--no-playlist",
+        "--print-json",
+        "--write-info-json",
+        "--write-thumbnail",
+        "-x",
+        "--audio-format",
+        "mp3",
+        "-o",
+        str(MEDIA_DIR / "%(id)s.%(ext)s"),
+        url,
+    ]
+
+def _parse_progress(line: str) -> float | None:
+    match = re.search(r"\[download\]\s+(\d+(?:\.\d+)?)%", line)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+def _iter_ytdlp_events(url: str):
+    command = _build_ytdlp_command(url)
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    if not process.stdout:
+        raise RuntimeError("yt-dlp did not return output")
+    infos: list[dict] = []
+    log_lines: list[str] = []
+    for raw_line in process.stdout:
+        line = raw_line.strip()
+        if not line:
+            continue
+        parsed = None
+        if line.lstrip().startswith("{"):
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                parsed = None
+        if isinstance(parsed, dict):
+            infos.append(parsed)
+            continue
+        log_lines.append(line)
+        yield {"type": "log", "message": line}
+        progress_value = _parse_progress(line)
+        if progress_value is not None:
+            yield {"type": "progress", "value": progress_value, "message": line}
+    process.wait()
+    if process.returncode != 0:
+        error_message = "\n".join(log_lines[-8:]) or "yt-dlp failed"
+        yield {"type": "error", "message": error_message}
+        return
+    if not infos:
+        yield {"type": "error", "message": "yt-dlp did not return metadata"}
+        return
+    tracks = _store_downloaded_tracks(infos)
+    yield {
+        "type": "complete",
+        "tracks": [asdict(track) for track in tracks],
+    }
+
 def _store_downloaded_tracks(infos: list[dict]) -> list[Track]:
     stored_tracks: list[Track] = []
     data = _load_library()
@@ -436,6 +508,21 @@ def import_track(payload: ImportRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/api/library/import/stream")
+def import_track_stream(payload: ImportRequest):
+    def event_generator():
+        try:
+            for event in _iter_ytdlp_events(payload.url):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except FileNotFoundError:
+            message = {"type": "error", "message": "yt-dlp is not installed"}
+            yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            message = {"type": "error", "message": str(exc)}
+            yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # --- 実行エントリポイント ---
 

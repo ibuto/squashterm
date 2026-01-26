@@ -590,6 +590,17 @@ select {
   gap: 8px;
 }
 
+.import-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.import-progress-text {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 .terminal-title {
   margin: 0;
   font-size: 12px;
@@ -753,6 +764,7 @@ select {
   cursor: pointer;
   display: grid;
   place-items: center;
+  position: relative;
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
@@ -775,6 +787,21 @@ select {
 .icon-button.is-favorite.is-active {
   background: rgba(244, 63, 94, 0.25);
   color: #fda4af;
+}
+
+.icon-button.is-loop {
+  background: rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+
+.loop-label {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: currentColor;
 }
 
 .player-menu {
@@ -822,7 +849,46 @@ select {
   font-size: 14px;
 }
 
+.player-menu-section {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.player-menu-title {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.player-menu-list {
+  display: grid;
+  gap: 4px;
+}
+
+.player-menu-item {
+  border: none;
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.player-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .player-menu-panel button:hover {
+  background: rgba(37, 99, 235, 0.35);
+}
+
+.player-menu-item:hover:not(:disabled) {
   background: rgba(37, 99, 235, 0.35);
 }
 

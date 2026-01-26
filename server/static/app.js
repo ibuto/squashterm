@@ -8,7 +8,6 @@ const favorites = document.getElementById("favorites");
 const playlistCreateToggle = document.getElementById("playlist-create-toggle");
 const playlistCreateForm = document.getElementById("playlist-create-form");
 const playlistNameInput = document.getElementById("playlist-name");
-const playlistTrackOptions = document.getElementById("playlist-track-options");
 const playlistDetailTitle = document.getElementById("playlist-detail-title");
 const playlistDetailDesc = document.getElementById("playlist-detail-desc");
 const playlistDetailBody = document.getElementById("playlist-detail-body");
@@ -21,6 +20,8 @@ const importUrl = document.getElementById("import-url");
 const importAutoTag = document.getElementById("import-auto-tag");
 const importSubmit = document.getElementById("import-submit");
 const importLog = document.getElementById("import-log");
+const importProgressBar = document.getElementById("import-progress-bar");
+const importProgressText = document.getElementById("import-progress-text");
 
 const statusVersion = document.getElementById("status-version");
 const statusDevice = document.getElementById("status-device");
@@ -40,11 +41,16 @@ const playerArtist = document.getElementById("player-artist");
 const playerAlbum = document.getElementById("player-album");
 const playerToggle = document.getElementById("player-toggle");
 const playerPrev = document.getElementById("player-prev");
+const playerSkipBack = document.getElementById("player-skip-back");
 const playerNext = document.getElementById("player-next");
+const playerSkipForward = document.getElementById("player-skip-forward");
 const playerStop = document.getElementById("player-stop");
+const playerLoop = document.getElementById("player-loop");
 const playerFavorite = document.getElementById("player-favorite");
 const playerMenuToggle = document.getElementById("player-menu-toggle");
 const playerMenuPanel = document.getElementById("player-menu-panel");
+const playerDownload = document.getElementById("player-download");
+const playerMenuPlaylists = document.getElementById("player-menu-playlists");
 const playerSeek = document.getElementById("player-seek");
 const playerCurrent = document.getElementById("player-current");
 const playerDuration = document.getElementById("player-duration");
@@ -55,8 +61,11 @@ const miniTitle = document.getElementById("mini-title");
 const miniArtist = document.getElementById("mini-artist");
 const miniToggle = document.getElementById("mini-toggle");
 const miniPrev = document.getElementById("mini-prev");
+const miniSkipBack = document.getElementById("mini-skip-back");
 const miniNext = document.getElementById("mini-next");
+const miniSkipForward = document.getElementById("mini-skip-forward");
 const miniStop = document.getElementById("mini-stop");
+const miniLoop = document.getElementById("mini-loop");
 const miniFavorite = document.getElementById("mini-favorite");
 const miniExpand = document.getElementById("mini-expand");
 const miniSeek = document.getElementById("mini-seek");
@@ -73,6 +82,7 @@ const state = {
 const playerState = {
   currentIndex: -1,
   isPlaying: false,
+  loopMode: "off",
 };
 
 const mediaViewState = {
@@ -116,6 +126,29 @@ const updatePlayerButtons = () => {
     }
   });
   updateMediaPlayingIndicator();
+};
+
+const loopModeLabels = {
+  off: { label: "オフ", short: "OFF" },
+  playlist: { label: "プレイリスト内ループ", short: "PL" },
+  track: { label: "1曲ループ", short: "1" },
+};
+
+const updateLoopButtons = () => {
+  const mode = playerState.loopMode;
+  const loopLabel = loopModeLabels[mode] || loopModeLabels.off;
+  [playerLoop, miniLoop].forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.setAttribute("aria-label", `ループ: ${loopLabel.label}`);
+    button.setAttribute("aria-pressed", mode === "off" ? "false" : "true");
+    button.classList.toggle("is-loop", mode !== "off");
+    const labelSpan = button.querySelector(".loop-label");
+    if (labelSpan) {
+      labelSpan.textContent = loopLabel.short;
+    }
+  });
 };
 
 const updateFavoriteButtons = () => {
@@ -274,6 +307,8 @@ const updatePlayerUI = () => {
       navigator.mediaSession.playbackState = "none";
     }
     updateMediaPlayingIndicator();
+    updateLoopButtons();
+    renderPlayerMenuPlaylists();
     return;
   }
   if (playerCover) {
@@ -307,6 +342,8 @@ const updatePlayerUI = () => {
   updateMediaSessionMetadata(track);
   updateMediaPlayingIndicator();
   updateFavoriteButtons();
+  updateLoopButtons();
+  renderPlayerMenuPlaylists();
 };
 
 const openPlayerOverlay = () => {
@@ -353,6 +390,19 @@ const togglePlayback = async () => {
   }
 };
 
+const seekBySeconds = (deltaSeconds) => {
+  if (!audioPlayer) {
+    return;
+  }
+  const duration = audioPlayer.duration || 0;
+  const current = audioPlayer.currentTime || 0;
+  const next = duration
+    ? Math.min(Math.max(current + deltaSeconds, 0), duration)
+    : Math.max(current + deltaSeconds, 0);
+  audioPlayer.currentTime = next;
+  updateMediaSessionPosition();
+};
+
 const stopPlayback = () => {
   if (!audioPlayer) {
     return;
@@ -388,6 +438,14 @@ const playPrev = () => {
   if (audioPlayer) {
     audioPlayer.play();
   }
+};
+
+const toggleLoopMode = () => {
+  const modes = ["off", "playlist", "track"];
+  const currentIndex = modes.indexOf(playerState.loopMode);
+  const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % modes.length;
+  playerState.loopMode = modes[nextIndex];
+  updateLoopButtons();
 };
 
 const renderMedia = () => {
@@ -475,26 +533,6 @@ const renderMedia = () => {
     });
     mediaGrid.appendChild(card);
   });
-};
-
-const renderPlaylistTrackOptions = () => {
-  if (!playlistTrackOptions) {
-    return;
-  }
-  if (state.tracks.length === 0) {
-    playlistTrackOptions.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
-    return;
-  }
-  playlistTrackOptions.innerHTML = state.tracks
-    .map(
-      (track) => `
-        <label class="playlist-track-option">
-          <input type="checkbox" value="${track.id}" />
-          <span>${track.title} / ${track.artist}</span>
-        </label>
-      `
-    )
-    .join("");
 };
 
 const setSelectedPlaylist = (type, playlistId) => {
@@ -689,6 +727,31 @@ const renderFavorites = () => {
   favorites.appendChild(button);
 };
 
+const renderPlayerMenuPlaylists = () => {
+  if (!playerMenuPlaylists) {
+    return;
+  }
+  playerMenuPlaylists.innerHTML = "";
+  if (!state.playlists.length) {
+    const empty = document.createElement("p");
+    empty.className = "player-menu-title";
+    empty.textContent = "プレイリストがありません";
+    playerMenuPlaylists.appendChild(empty);
+    return;
+  }
+  state.playlists.forEach((playlist) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "player-menu-item";
+    button.textContent = playlist.name;
+    button.disabled = playerState.currentIndex === -1;
+    button.addEventListener("click", () => {
+      addTrackToPlaylist(playlist.id);
+    });
+    playerMenuPlaylists.appendChild(button);
+  });
+};
+
 const reorderTrackIds = (trackIds, draggedId, targetId) => {
   const fromIndex = trackIds.indexOf(draggedId);
   const toIndex = trackIds.indexOf(targetId);
@@ -707,6 +770,31 @@ const updatePlaylistTracks = async (playlistId, trackIds) => {
 
 const updateFavoritesTracks = async (trackIds) => {
   await requestJson("/api/favorites", { track_ids: trackIds }, "PUT");
+};
+
+const addTrackToPlaylist = async (playlistId) => {
+  const track = state.tracks[playerState.currentIndex];
+  if (!track) {
+    return;
+  }
+  const playlist = state.playlists.find((item) => item.id === playlistId);
+  if (!playlist) {
+    return;
+  }
+  if (playlist.track_ids.includes(track.id)) {
+    appendImportLog("この曲はすでにプレイリストに登録されています。", { append: true });
+    return;
+  }
+  const updatedTrackIds = [...playlist.track_ids, track.id];
+  try {
+    await updatePlaylistTracks(playlistId, updatedTrackIds);
+    playlist.track_ids = updatedTrackIds;
+    renderPlaylistDetail();
+    renderPlaylists();
+    renderPlayerMenuPlaylists();
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 const reorderPlaylistTracks = async (listType, draggedId, targetId) => {
@@ -908,19 +996,6 @@ const fetchJson = async (path) => {
   return response.json();
 };
 
-const postJson = async (path, payload) => {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Failed to post ${path}`);
-  }
-  return response.json();
-};
-
 const requestJson = async (path, payload, method) => {
   const response = await fetch(path, {
     method,
@@ -951,27 +1026,94 @@ const refreshLibrary = async () => {
   updateMediaViewToggle();
   renderPlaylists();
   renderFavorites();
-  renderPlaylistTrackOptions();
   renderPlaylistDetail();
   renderTagOptions();
   updatePlayerUI();
   updateFavoriteButtons();
+  renderPlayerMenuPlaylists();
 };
 
-const appendImportLog = (message) => {
+const appendImportLog = (message, options = {}) => {
   if (!importLog) {
     return;
   }
-
-  // TODO: このような処理は許されないので修正する
+  const { append, reset } = options;
   const maxLength = 3000;
-  if (message.length > maxLength) {
-    importLog.textContent = `\n\n${message.slice(
-      -maxLength
-    )}`;
+  if (reset) {
+    importLog.textContent = "";
+  }
+  const currentText = append ? `${importLog.textContent}\n${message}` : message;
+  if (currentText.length > maxLength) {
+    importLog.textContent = currentText.slice(-maxLength);
     return;
   }
-  importLog.textContent = message;
+  importLog.textContent = currentText.trimStart();
+};
+
+const updateImportProgress = (percent, message) => {
+  if (!importProgressBar || !importProgressText) {
+    return;
+  }
+  const clamped = Math.max(0, Math.min(100, Math.floor(percent)));
+  importProgressBar.style.width = `${clamped}%`;
+  importProgressText.textContent = message
+    ? `進行状況: ${clamped}% (${message})`
+    : `進行状況: ${clamped}%`;
+};
+
+const streamImport = async (payload) => {
+  const response = await fetch("/api/library/import/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "ストリームの開始に失敗しました。");
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    chunks.forEach((chunk) => {
+      const line = chunk
+        .split("\n")
+        .find((entry) => entry.startsWith("data: "));
+      if (!line) {
+        return;
+      }
+      const data = line.replace("data: ", "").trim();
+      if (!data) {
+        return;
+      }
+      try {
+        const event = JSON.parse(data);
+        if (event.type === "log") {
+          appendImportLog(event.message, { append: true });
+        }
+        if (event.type === "progress") {
+          updateImportProgress(event.value, event.message);
+        }
+        if (event.type === "error") {
+          updateImportProgress(0, "エラー");
+          appendImportLog(`エラー: ${event.message}`, { append: true });
+        }
+        if (event.type === "complete") {
+          updateImportProgress(100, "完了");
+          appendImportLog("取り込み完了。", { append: true });
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  }
 };
 
 const handleImportSubmit = async () => {
@@ -984,46 +1126,40 @@ const handleImportSubmit = async () => {
     url,
   };
   payload.auto_tag = Boolean(importAutoTag?.checked);
-  appendImportLog("yt-dlp を実行中...");
+  appendImportLog("yt-dlp を実行中...", { reset: true });
+  updateImportProgress(0, "開始");
   try {
-    const response = await postJson("/api/library/import", payload);
-    appendImportLog(response.log || "取り込み完了。");
+    await streamImport(payload);
     await refreshLibrary();
     importUrl.value = "";
   } catch (error) {
-    appendImportLog(`エラー: ${error.message}`);
+    appendImportLog(`エラー: ${error.message}`, { append: true });
+    updateImportProgress(0, "失敗");
   }
 };
 
 const handlePlaylistCreate = async () => {
-  if (!playlistNameInput || !playlistTrackOptions) {
+  if (!playlistNameInput) {
     return;
   }
   const name = playlistNameInput.value.trim();
   if (!name) {
     return;
   }
-  const selectedTrackIds = Array.from(
-    playlistTrackOptions.querySelectorAll("input[type='checkbox']:checked")
-  ).map((input) => input.value);
   try {
     const playlist = await requestJson(
       "/api/playlists",
-      { name, track_ids: selectedTrackIds },
+      { name, track_ids: [] },
       "POST"
     );
     state.playlists.push(playlist);
     playlistNameInput.value = "";
-    playlistTrackOptions
-      .querySelectorAll("input[type='checkbox']")
-      .forEach((input) => {
-        input.checked = false;
-      });
     if (playlistCreateForm) {
       playlistCreateForm.classList.remove("is-open");
       playlistCreateForm.setAttribute("aria-hidden", "true");
     }
     setSelectedPlaylist("playlist", playlist.id);
+    renderPlayerMenuPlaylists();
   } catch (error) {
     console.error(error);
   }
@@ -1050,11 +1186,11 @@ const init = async () => {
     updateMediaViewToggle();
     renderPlaylists();
     renderFavorites();
-    renderPlaylistTrackOptions();
     renderPlaylistDetail();
     renderTagOptions();
     updatePlayerUI();
     updateFavoriteButtons();
+    renderPlayerMenuPlaylists();
     if (tracks.length === 0) {
       updatePlayerUI();
     }
@@ -1157,7 +1293,16 @@ if (audioPlayer) {
   });
 
   audioPlayer.addEventListener("ended", () => {
-    playNext();
+    if (playerState.loopMode === "track") {
+      audioPlayer.currentTime = 0;
+      audioPlayer.play();
+      return;
+    }
+    if (playerState.loopMode === "playlist") {
+      playNext();
+      return;
+    }
+    stopPlayback();
   });
 }
 
@@ -1197,15 +1342,33 @@ if (playerPrev) {
   });
 }
 
+if (playerSkipBack) {
+  playerSkipBack.addEventListener("click", () => {
+    seekBySeconds(-10);
+  });
+}
+
 if (playerNext) {
   playerNext.addEventListener("click", () => {
     playNext();
   });
 }
 
+if (playerSkipForward) {
+  playerSkipForward.addEventListener("click", () => {
+    seekBySeconds(10);
+  });
+}
+
 if (playerStop) {
   playerStop.addEventListener("click", () => {
     stopPlayback();
+  });
+}
+
+if (playerLoop) {
+  playerLoop.addEventListener("click", () => {
+    toggleLoopMode();
   });
 }
 
@@ -1227,15 +1390,33 @@ if (miniPrev) {
   });
 }
 
+if (miniSkipBack) {
+  miniSkipBack.addEventListener("click", () => {
+    seekBySeconds(-10);
+  });
+}
+
 if (miniNext) {
   miniNext.addEventListener("click", () => {
     playNext();
   });
 }
 
+if (miniSkipForward) {
+  miniSkipForward.addEventListener("click", () => {
+    seekBySeconds(10);
+  });
+}
+
 if (miniStop) {
   miniStop.addEventListener("click", () => {
     stopPlayback();
+  });
+}
+
+if (miniLoop) {
+  miniLoop.addEventListener("click", () => {
+    toggleLoopMode();
   });
 }
 
@@ -1268,6 +1449,23 @@ if (playerMenuPanel) {
     if (target && target.matches("button")) {
       closePlayerMenu();
     }
+  });
+}
+
+if (playerDownload) {
+  playerDownload.addEventListener("click", () => {
+    const track = state.tracks[playerState.currentIndex];
+    if (!track?.file_url) {
+      appendImportLog("ダウンロードできる音源がありません。", { append: true });
+      return;
+    }
+    const anchor = document.createElement("a");
+    const safeTitle = track.title.replace(/[\\/:*?"<>|]/g, "_");
+    anchor.href = track.file_url;
+    anchor.download = `${safeTitle}.mp3`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   });
 }
 
