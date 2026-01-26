@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import platform
+import shutil
 import subprocess
 import uuid
 from dataclasses import asdict, dataclass
@@ -234,6 +236,23 @@ def _build_settings_payload() -> dict:
         "playback_options": settings.get("playback_options", []),
     }
 
+def _build_system_payload() -> dict:
+    usage = shutil.disk_usage(DATA_DIR)
+    total_gb = usage.total / (1024**3)
+    free_gb = usage.free / (1024**3)
+    used_gb = usage.used / (1024**3)
+    percent = int((used_gb / total_gb) * 100) if total_gb else 0
+    return {
+        "storage": {
+            "total_gb": round(total_gb, 1),
+            "used_gb": round(used_gb, 1),
+            "free_gb": round(free_gb, 1),
+            "percent": percent,
+        },
+        "os": platform.platform(),
+        "hostname": platform.node(),
+    }
+
 def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
     command = [
         "yt-dlp",
@@ -348,6 +367,10 @@ def get_status():
 @app.get("/api/settings")
 def get_settings():
     return _build_settings_payload()
+
+@app.get("/api/system")
+def get_system():
+    return _build_system_payload()
 
 @app.post("/api/library/import")
 def import_track(payload: ImportRequest):

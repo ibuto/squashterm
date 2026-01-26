@@ -21,6 +21,7 @@ const settingsVersionList = document.getElementById("settings-version-list");
 const settingsStorageBar = document.getElementById("settings-storage-bar");
 const settingsStorageText = document.getElementById("settings-storage-text");
 const settingsPlaybackOptions = document.getElementById("settings-playback-options");
+const systemInfoList = document.getElementById("system-info-list");
 
 const audioPlayer = document.getElementById("audio-player");
 const playerOverlay = document.getElementById("player-overlay");
@@ -414,16 +415,6 @@ const renderSettings = (settings) => {
       `<li>ビルド: <strong>${version.build || "--"}</strong></li>`,
     ].join("");
   }
-  if (settingsStorageBar && settingsStorageText) {
-    const storage = settings?.storage || {};
-    const used = Number(storage.used_gb ?? 0);
-    const total = Number(storage.total_gb ?? 0);
-    const percent = Math.max(0, Math.min(100, Number(storage.percent ?? 0)));
-    settingsStorageBar.style.width = `${percent}%`;
-    settingsStorageText.textContent = `楽曲: ${used.toFixed(1)}GB / ${total.toFixed(
-      1
-    )}GB`;
-  }
   if (settingsPlaybackOptions) {
     const options = settings?.playback_options || [];
     settingsPlaybackOptions.innerHTML = "";
@@ -444,6 +435,31 @@ const renderSettings = (settings) => {
         settingsPlaybackOptions.appendChild(label);
       });
     }
+  }
+};
+
+const renderSystem = (system) => {
+  if (!system) {
+    return;
+  }
+  if (settingsStorageBar && settingsStorageText) {
+    const storage = system.storage || {};
+    const used = Number(storage.used_gb ?? 0);
+    const total = Number(storage.total_gb ?? 0);
+    const free = Number(storage.free_gb ?? 0);
+    const percent = Math.max(0, Math.min(100, Number(storage.percent ?? 0)));
+    settingsStorageBar.style.width = `${percent}%`;
+    settingsStorageText.textContent = `使用中: ${used.toFixed(
+      1
+    )}GB / ${total.toFixed(1)}GB（空き ${free.toFixed(1)}GB）`;
+  }
+  if (systemInfoList) {
+    const os = system.os || "--";
+    const hostname = system.hostname || "--";
+    systemInfoList.innerHTML = [
+      `<li>ホスト名: <strong>${hostname}</strong></li>`,
+      `<li>OS: <strong>${os}</strong></li>`,
+    ].join("");
   }
 };
 
@@ -564,13 +580,15 @@ const handleImportSubmit = async () => {
 
 const init = async () => {
   try {
-    const [tracks, playlists, favoritesData, status, settings] = await Promise.all([
-      fetchJson("/api/library"),
-      fetchJson("/api/playlists"),
-      fetchJson("/api/favorites"),
-      fetchJson("/api/status"),
-      fetchJson("/api/settings"),
-    ]);
+    const [tracks, playlists, favoritesData, status, settings, system] =
+      await Promise.all([
+        fetchJson("/api/library"),
+        fetchJson("/api/playlists"),
+        fetchJson("/api/favorites"),
+        fetchJson("/api/status"),
+        fetchJson("/api/settings"),
+        fetchJson("/api/system"),
+      ]);
 
     state.tracks = tracks;
     state.playlists = playlists;
@@ -595,6 +613,7 @@ const init = async () => {
       statusTime.textContent = status.time;
     }
     renderSettings(settings);
+    renderSystem(system);
   } catch (error) {
     console.error(error);
   }

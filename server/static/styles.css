@@ -723,6 +723,27 @@ select {
     padding: 18px;
   }
 
+  .manage-grid,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  input,
+  select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .primary,
+  .secondary {
+    width: 100%;
+    justify-content: center;
+  }
+
   .app-header h2 {
     font-size: 22px;
   }
