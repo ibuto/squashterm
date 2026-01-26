@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import importlib
+import importlib.util
 import platform
 import re
 import shutil
@@ -11,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 # --- 新しいライブラリのインポート ---
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -72,6 +74,8 @@ class Track:
 
 class ImportRequest(BaseModel):
     url: str
+    playlist_id: str | None = None
+    auto_tag: bool | None = None
 
 class PlaylistCreate(BaseModel):
     name: str
@@ -132,6 +136,20 @@ def _parse_track_from_info(info: dict, source_url: str | None = None) -> Track:
         source_url=resolved_source_url,
     )
 
+def _parse_bool(value: str | bool | None, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+def _load_mutagen() -> tuple[object | None, object | None]:
+    if importlib.util.find_spec("mutagen") is None:
+        return None, None
+    mutagen_module = importlib.import_module("mutagen")
+    mutagen_id3 = importlib.import_module("mutagen.id3")
+    return mutagen_module.File, mutagen_id3.ID3
+
 def _resolve_thumbnail_path(info: dict) -> str | None:
     track_id = info.get("id")
     if not track_id:
@@ -169,6 +187,82 @@ def _resolve_thumbnail_path(info: dict) -> str | None:
             continue
         return f"/media/{candidate.name}"
     return None
+
+def _extract_id3_metadata(file_path: Path) -> dict:
+    metadata = {
+        "title": None,
+        "artist": None,
+        "album": None,
+        "genre": None,
+        "year": 0,
+        "duration": "--",
+    }
+    mutagen_file, _ = _load_mutagen()
+    if not mutagen_file:
+        return metadata
+    audio = mutagen_file(file_path, easy=True)
+    if audio:
+        tags = audio.tags or {}
+        metadata["title"] = (tags.get("title") or [None])[0]
+        metadata["artist"] = (tags.get("artist") or [None])[0]
+        metadata["album"] = (tags.get("album") or [None])[0]
+        metadata["genre"] = (tags.get("genre") or [None])[0]
+        date_value = (tags.get("date") or tags.get("year") or [None])[0]
+        if isinstance(date_value, str) and date_value[:4].isdigit():
+            metadata["year"] = int(date_value[:4])
+        duration = getattr(audio.info, "length", None)
+        if duration:
+            metadata["duration"] = _format_duration(duration)
+    return metadata
+
+def _extension_from_mime(mime: str | None) -> str:
+    if not mime:
+        return ""
+    normalized = mime.lower()
+    if "jpeg" in normalized or "jpg" in normalized:
+        return ".jpg"
+    if "png" in normalized:
+        return ".png"
+    if "webp" in normalized:
+        return ".webp"
+    if "gif" in normalized:
+        return ".gif"
+    return ""
+
+def _save_cover_from_id3(file_path: Path, track_id: str) -> str | None:
+    _, mutagen_id3 = _load_mutagen()
+    if not mutagen_id3:
+        return None
+    try:
+        id3 = mutagen_id3(file_path)
+    except Exception:
+        return None
+    for key in id3.keys():
+        if not key.startswith("APIC"):
+            continue
+        apic = id3.get(key)
+        if not apic:
+            continue
+        ext = _extension_from_mime(apic.mime) or ".jpg"
+        cover_path = MEDIA_DIR / f"{track_id}_cover{ext}"
+        cover_path.write_bytes(apic.data)
+        return f"/media/{cover_path.name}"
+    return None
+
+def _append_tracks_to_playlist(playlist_id: str | None, track_ids: list[str]) -> None:
+    if not playlist_id:
+        return
+    data = _load_library()
+    playlists = data.get("playlists", [])
+    playlist = next((item for item in playlists if item.get("id") == playlist_id), None)
+    if not playlist:
+        return
+    current_ids = playlist.get("track_ids", [])
+    for track_id in track_ids:
+        if track_id not in current_ids:
+            current_ids.append(track_id)
+    playlist["track_ids"] = current_ids
+    _save_library(data)
 
 def _init_library() -> None:
     _ensure_data_dirs()
@@ -342,7 +436,7 @@ def _parse_progress(line: str) -> float | None:
     except ValueError:
         return None
 
-def _iter_ytdlp_events(url: str):
+def _iter_ytdlp_events(url: str, playlist_id: str | None = None):
     command = _build_ytdlp_command(url)
     process = subprocess.Popen(
         command,
@@ -381,13 +475,15 @@ def _iter_ytdlp_events(url: str):
     if not infos:
         yield {"type": "error", "message": "yt-dlp did not return metadata"}
         return
-    tracks = _store_downloaded_tracks(infos, url)
+    tracks = _store_downloaded_tracks(infos, url, playlist_id)
     yield {
         "type": "complete",
         "tracks": [asdict(track) for track in tracks],
     }
 
-def _store_downloaded_tracks(infos: list[dict], source_url: str | None = None) -> list[Track]:
+def _store_downloaded_tracks(
+    infos: list[dict], source_url: str | None = None, playlist_id: str | None = None
+) -> list[Track]:
     stored_tracks: list[Track] = []
     data = _load_library()
     tracks = data.setdefault("tracks", [])
@@ -411,11 +507,14 @@ def _store_downloaded_tracks(infos: list[dict], source_url: str | None = None) -
                 track_entry["source_url"] = track.source_url
         stored_tracks.append(track)
     _save_library(data)
+    _append_tracks_to_playlist(playlist_id, [track.id for track in stored_tracks])
     return stored_tracks
 
-def _ingest_from_url(url: str) -> tuple[list[Track], str]:
+def _ingest_from_url(
+    url: str, playlist_id: str | None = None
+) -> tuple[list[Track], str]:
     infos, log_output = _download_with_ytdlp(url)
-    tracks = _store_downloaded_tracks(infos, url)
+    tracks = _store_downloaded_tracks(infos, url, playlist_id)
     return tracks, log_output
 
 # --- FastAPI アプリケーション定義 ---
@@ -544,7 +643,7 @@ def import_track(payload: ImportRequest):
     他のリクエスト(再生など)をブロックしません。
     """
     try:
-        tracks, log_output = _ingest_from_url(payload.url)
+        tracks, log_output = _ingest_from_url(payload.url, payload.playlist_id)
         return {
             "tracks": [asdict(track) for track in tracks],
             "log": log_output,
@@ -560,7 +659,7 @@ def import_track(payload: ImportRequest):
 def import_track_stream(payload: ImportRequest):
     def event_generator():
         try:
-            for event in _iter_ytdlp_events(payload.url):
+            for event in _iter_ytdlp_events(payload.url, payload.playlist_id):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except FileNotFoundError:
             message = {"type": "error", "message": "yt-dlp is not installed"}
@@ -570,6 +669,74 @@ def import_track_stream(payload: ImportRequest):
             yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.post("/api/library/upload")
+async def upload_track(
+    file: UploadFile = File(...),
+    cover: UploadFile | None = File(None),
+    title: str | None = Form(None),
+    artist: str | None = Form(None),
+    album: str | None = Form(None),
+    genre: str | None = Form(None),
+    year: str | None = Form(None),
+    source_url: str | None = Form(None),
+    auto_tag: str | bool | None = Form(True),
+    playlist_id: str | None = Form(None),
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File is required")
+    _ensure_data_dirs()
+    extension = Path(file.filename).suffix or ".mp3"
+    track_id = f"local_{uuid.uuid4().hex}"
+    file_path = MEDIA_DIR / f"{track_id}{extension}"
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    parsed = {}
+    if _parse_bool(auto_tag, True):
+        parsed = _extract_id3_metadata(file_path)
+    resolved_title = title or parsed.get("title") or "Unknown Title"
+    resolved_artist = artist or parsed.get("artist") or "Unknown Artist"
+    resolved_album = album or parsed.get("album") or "Unknown Album"
+    resolved_genre = genre or parsed.get("genre") or "Unknown"
+    resolved_year = 0
+    year_text = year or ""
+    if year_text.isdigit():
+        resolved_year = int(year_text)
+    elif parsed.get("year"):
+        resolved_year = parsed.get("year", 0)
+    resolved_duration = parsed.get("duration") or "--"
+    cover_url = DEFAULT_COVER
+    if cover and cover.filename:
+        cover_extension = Path(cover.filename).suffix
+        if not cover_extension:
+            cover_extension = _extension_from_mime(cover.content_type) or ".jpg"
+        cover_path = MEDIA_DIR / f"{track_id}_cover{cover_extension}"
+        with cover_path.open("wb") as buffer:
+            shutil.copyfileobj(cover.file, buffer)
+        cover_url = f"/media/{cover_path.name}"
+    else:
+        id3_cover = _save_cover_from_id3(file_path, track_id)
+        if id3_cover:
+            cover_url = id3_cover
+    track = Track(
+        id=track_id,
+        title=resolved_title,
+        artist=resolved_artist,
+        album=resolved_album,
+        cover=cover_url,
+        duration=resolved_duration,
+        bpm=0,
+        genre=resolved_genre,
+        year=resolved_year,
+        file_url=f"/media/{file_path.name}",
+        source_url=source_url,
+    )
+    data = _load_library()
+    tracks = data.setdefault("tracks", [])
+    tracks.append({**asdict(track), "file_path": str(file_path)})
+    _save_library(data)
+    _append_tracks_to_playlist(playlist_id, [track.id])
+    return asdict(track)
 
 # --- 実行エントリポイント ---
 

@@ -46,14 +46,22 @@
                 <h3>メディアライブラリ</h3>
                 <p>登録されている曲一覧です。</p>
               </div>
-              <button
-                class="secondary view-toggle"
-                id="media-view-toggle"
-                type="button"
-                aria-pressed="false"
-              >
-                リスト表示
-              </button>
+              <div class="panel-actions">
+                <input
+                  type="search"
+                  id="media-search"
+                  class="search-input"
+                  placeholder="曲を検索"
+                />
+                <button
+                  class="secondary view-toggle"
+                  id="media-view-toggle"
+                  type="button"
+                  aria-pressed="false"
+                >
+                  リスト表示
+                </button>
+              </div>
             </div>
             <div class="media-grid" id="media-grid"></div>
           </section>
@@ -78,15 +86,35 @@
                   </label>
                   <button class="primary" type="submit">作成する</button>
                 </form>
+                <label class="search-field">
+                  <span>プレイリスト検索</span>
+                  <input
+                    type="search"
+                    id="playlist-search"
+                    class="search-input"
+                    placeholder="プレイリスト名で検索"
+                  />
+                </label>
                 <div class="playlist-list" id="playlist-list"></div>
                 <div class="favorites" id="favorites"></div>
               </div>
               <div class="playlist-detail">
                 <div class="playlist-detail-header">
-                  <h4 id="playlist-detail-title">プレイリストを選択</h4>
-                  <p id="playlist-detail-desc">
-                    左側のリストから表示したいプレイリストを選択してください。
-                  </p>
+                  <div>
+                    <h4 id="playlist-detail-title">プレイリストを選択</h4>
+                    <p id="playlist-detail-desc">
+                      左側のリストから表示したいプレイリストを選択してください。
+                    </p>
+                  </div>
+                  <label class="search-field">
+                    <span>曲検索</span>
+                    <input
+                      type="search"
+                      id="playlist-track-search"
+                      class="search-input"
+                      placeholder="曲名・アーティストで検索"
+                    />
+                  </label>
                 </div>
                 <div class="playlist-detail-body" id="playlist-detail-body"></div>
               </div>
@@ -116,6 +144,12 @@
                 <label class="checkbox">
                   <input type="checkbox" id="import-auto-tag" checked />
                   <span>ダウンロード後に自動でID3タグを解析</span>
+                </label>
+                <label>
+                  <span>自動追加先プレイリスト</span>
+                  <select id="import-playlist-select">
+                    <option value="">指定なし</option>
+                  </select>
                 </label>
                 <button type="button" class="primary" id="import-submit">ライブラリに追加</button>
                 <div class="import-progress">
@@ -155,6 +189,58 @@
                   <input type="url" id="tag-source-url" placeholder="https://..." />
                 </label>
                 <button type="button" class="secondary" id="tag-save">変更内容を保存</button>
+              </form>
+              <form class="card" id="upload-form">
+                <h4>ローカルファイルを追加</h4>
+                <label>
+                  <span>音声ファイル</span>
+                  <input type="file" id="upload-audio" accept="audio/*" required />
+                </label>
+                <label>
+                  <span>カバー画像</span>
+                  <input type="file" id="upload-cover" accept="image/*" />
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="upload-auto-tag" checked />
+                  <span>ID3タグを自動解析</span>
+                </label>
+                <div class="form-grid">
+                  <label>
+                    <span>タイトル</span>
+                    <input type="text" id="upload-title" placeholder="楽曲タイトル" />
+                  </label>
+                  <label>
+                    <span>アーティスト</span>
+                    <input type="text" id="upload-artist" placeholder="アーティスト名" />
+                  </label>
+                  <label>
+                    <span>アルバム</span>
+                    <input type="text" id="upload-album" placeholder="アルバム名" />
+                  </label>
+                  <label>
+                    <span>ジャンル</span>
+                    <input type="text" id="upload-genre" placeholder="ジャンル" />
+                  </label>
+                  <label>
+                    <span>リリース年</span>
+                    <input type="number" id="upload-year" placeholder="2024" />
+                  </label>
+                  <label>
+                    <span>ソース URL</span>
+                    <input type="url" id="upload-source-url" placeholder="https://..." />
+                  </label>
+                </div>
+                <label>
+                  <span>追加先プレイリスト</span>
+                  <select id="upload-playlist-select">
+                    <option value="">指定なし</option>
+                  </select>
+                </label>
+                <button type="submit" class="primary">アップロード</button>
+                <div class="terminal">
+                  <p class="terminal-title">アップロードログ</p>
+                  <pre class="terminal-output" id="upload-log">待機中...</pre>
+                </div>
               </form>
             </div>
           </section>
@@ -407,6 +493,51 @@
           </button>
         </div>
         <div class="modal-body" id="playlist-modal-list"></div>
+      </div>
+    </div>
+
+    <div
+      class="modal-overlay"
+      id="track-edit-modal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header">
+          <h3>メタデータを編集</h3>
+          <button type="button" class="icon-button" id="track-edit-close" aria-label="閉じる">
+            ×
+          </button>
+        </div>
+        <div class="modal-body">
+          <form class="modal-form" id="track-edit-form">
+            <label>
+              <span>タイトル</span>
+              <input type="text" id="track-edit-title" />
+            </label>
+            <label>
+              <span>アーティスト</span>
+              <input type="text" id="track-edit-artist" />
+            </label>
+            <label>
+              <span>アルバム</span>
+              <input type="text" id="track-edit-album" />
+            </label>
+            <label>
+              <span>ソース URL</span>
+              <input type="url" id="track-edit-source-url" />
+            </label>
+            <div class="modal-actions">
+              <button type="button" class="secondary" id="track-edit-cancel">
+                キャンセル
+              </button>
+              <button type="submit" class="primary" id="track-edit-save">
+                保存する
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
