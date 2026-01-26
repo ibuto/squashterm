@@ -76,7 +76,6 @@
                     <span>プレイリスト名</span>
                     <input type="text" id="playlist-name" placeholder="プレイリスト名" />
                   </label>
-                  <div class="playlist-track-options" id="playlist-track-options"></div>
                   <button class="primary" type="submit">作成する</button>
                 </form>
                 <div class="playlist-list" id="playlist-list"></div>
@@ -119,6 +118,14 @@
                   <span>ダウンロード後に自動でID3タグを解析</span>
                 </label>
                 <button type="button" class="primary" id="import-submit">ライブラリに追加</button>
+                <div class="import-progress">
+                  <div class="progress">
+                    <div class="progress-bar" id="import-progress-bar"></div>
+                  </div>
+                  <p class="import-progress-text" id="import-progress-text">
+                    進行状況: 0%
+                  </p>
+                </div>
                 <div class="terminal">
                   <p class="terminal-title">yt-dlp 実行ログ</p>
                   <pre class="terminal-output" id="import-log">待機中...</pre>
@@ -211,6 +218,32 @@
                 <span class="sr-only">前へ</span>
               </button>
               <button
+                class="icon-button"
+                type="button"
+                id="player-skip-back"
+                aria-label="10秒戻し"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M11 5a7 7 0 1 0 7 7"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <polyline
+                    points="8,6 11,3 14,6"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <text x="9" y="16" font-size="7" fill="currentColor">10</text>
+                </svg>
+                <span class="sr-only">10秒戻し</span>
+              </button>
+              <button
                 class="icon-button is-primary toggle-button"
                 type="button"
                 id="player-toggle"
@@ -225,6 +258,32 @@
                 </svg>
                 <span class="sr-only">再生</span>
               </button>
+              <button
+                class="icon-button"
+                type="button"
+                id="player-skip-forward"
+                aria-label="10秒スキップ"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M13 5a7 7 0 1 1-7 7"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <polyline
+                    points="16,6 13,3 10,6"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <text x="8" y="16" font-size="7" fill="currentColor">10</text>
+                </svg>
+                <span class="sr-only">10秒スキップ</span>
+              </button>
               <button class="icon-button" type="button" id="player-next" aria-label="次へ">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <polygon points="4,5 14,12 4,19" />
@@ -237,6 +296,48 @@
                   <rect x="7" y="7" width="10" height="10" rx="2" />
                 </svg>
                 <span class="sr-only">停止</span>
+              </button>
+              <button
+                class="icon-button"
+                type="button"
+                id="player-loop"
+                aria-label="ループ: オフ"
+                aria-pressed="false"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M4 12a6 6 0 0 1 10-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <polyline
+                    points="14,4 14,8 10,8"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M20 12a6 6 0 0 1-10 4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <polyline
+                    points="10,20 10,16 14,16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span class="loop-label" aria-hidden="true">OFF</span>
+                <span class="sr-only">ループ</span>
               </button>
               <button
                 class="icon-button is-favorite"
@@ -270,8 +371,13 @@
                 <span class="sr-only">メニュー</span>
               </button>
               <div class="player-menu-panel" id="player-menu-panel" role="menu" aria-hidden="true">
-                <button type="button" role="menuitem">ダウンロード</button>
-                <button type="button" role="menuitem">プレイリストに追加</button>
+                <button type="button" role="menuitem" id="player-download">
+                  ダウンロード
+                </button>
+                <div class="player-menu-section">
+                  <p class="player-menu-title">プレイリストに追加</p>
+                  <div class="player-menu-list" id="player-menu-playlists"></div>
+                </div>
                 <button type="button" role="menuitem">情報を編集</button>
               </div>
             </div>
@@ -297,6 +403,32 @@
           <span class="sr-only">前へ</span>
         </button>
         <button
+          class="icon-button"
+          type="button"
+          id="mini-skip-back"
+          aria-label="10秒戻し"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 5a7 7 0 1 0 7 7"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <polyline
+              points="8,6 11,3 14,6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <text x="9" y="16" font-size="7" fill="currentColor">10</text>
+          </svg>
+          <span class="sr-only">10秒戻し</span>
+        </button>
+        <button
           class="icon-button is-primary toggle-button"
           type="button"
           id="mini-toggle"
@@ -311,6 +443,32 @@
           </svg>
           <span class="sr-only">再生</span>
         </button>
+        <button
+          class="icon-button"
+          type="button"
+          id="mini-skip-forward"
+          aria-label="10秒スキップ"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M13 5a7 7 0 1 1-7 7"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <polyline
+              points="16,6 13,3 10,6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <text x="8" y="16" font-size="7" fill="currentColor">10</text>
+          </svg>
+          <span class="sr-only">10秒スキップ</span>
+        </button>
         <button class="icon-button" type="button" id="mini-next" aria-label="次へ">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <polygon points="4,5 14,12 4,19" />
@@ -323,6 +481,48 @@
             <rect x="7" y="7" width="10" height="10" rx="2" />
           </svg>
           <span class="sr-only">停止</span>
+        </button>
+        <button
+          class="icon-button"
+          type="button"
+          id="mini-loop"
+          aria-label="ループ: オフ"
+          aria-pressed="false"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M4 12a6 6 0 0 1 10-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <polyline
+              points="14,4 14,8 10,8"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M20 12a6 6 0 0 1-10 4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <polyline
+              points="10,20 10,16 14,16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="loop-label" aria-hidden="true">OFF</span>
+          <span class="sr-only">ループ</span>
         </button>
         <button
           class="icon-button is-favorite"
