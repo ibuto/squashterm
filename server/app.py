@@ -71,6 +71,17 @@ class Track:
 class ImportRequest(BaseModel):
     url: str
 
+class PlaylistCreate(BaseModel):
+    name: str
+    track_ids: list[str] = []
+
+class PlaylistUpdate(BaseModel):
+    name: str | None = None
+    track_ids: list[str] | None = None
+
+class FavoritesUpdate(BaseModel):
+    track_ids: list[str]
+
 # --- ヘルパー関数 (既存ロジックを流用) ---
 
 def _ensure_data_dirs() -> None:
@@ -349,9 +360,43 @@ def get_library():
 def get_playlists():
     return _fetch_playlists()
 
+@app.post("/api/playlists")
+def create_playlist(payload: PlaylistCreate):
+    data = _load_library()
+    playlists = data.setdefault("playlists", [])
+    playlist = {
+        "id": f"pl_{uuid.uuid4().hex}",
+        "name": payload.name,
+        "track_ids": payload.track_ids,
+    }
+    playlists.append(playlist)
+    _save_library(data)
+    return playlist
+
+@app.put("/api/playlists/{playlist_id}")
+def update_playlist(playlist_id: str, payload: PlaylistUpdate):
+    data = _load_library()
+    playlists = data.get("playlists", [])
+    playlist = next((item for item in playlists if item.get("id") == playlist_id), None)
+    if playlist is None:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    if payload.name is not None:
+        playlist["name"] = payload.name
+    if payload.track_ids is not None:
+        playlist["track_ids"] = payload.track_ids
+    _save_library(data)
+    return playlist
+
 @app.get("/api/favorites")
 def get_favorites():
     return _fetch_favorites()
+
+@app.put("/api/favorites")
+def update_favorites(payload: FavoritesUpdate):
+    data = _load_library()
+    data["favorites"] = payload.track_ids
+    _save_library(data)
+    return data["favorites"]
 
 @app.get("/api/status")
 def get_status():

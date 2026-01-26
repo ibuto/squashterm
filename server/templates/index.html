@@ -64,11 +64,33 @@
                 <h3>プレイリスト</h3>
                 <p>登録されているプレイリストです。</p>
               </div>
-              <button class="primary">新規プレイリスト作成</button>
+              <button class="primary" type="button" id="playlist-create-toggle">
+                新規プレイリスト作成
+              </button>
             </div>
             <div class="playlist-layout">
-              <div class="playlist-list" id="playlist-list"></div>
-              <div class="favorites" id="favorites"></div>
+              <div class="playlist-sidebar">
+                <form class="card playlist-create" id="playlist-create-form" aria-hidden="true">
+                  <h4>新規プレイリスト</h4>
+                  <label>
+                    <span>プレイリスト名</span>
+                    <input type="text" id="playlist-name" placeholder="プレイリスト名" />
+                  </label>
+                  <div class="playlist-track-options" id="playlist-track-options"></div>
+                  <button class="primary" type="submit">作成する</button>
+                </form>
+                <div class="playlist-list" id="playlist-list"></div>
+                <div class="favorites" id="favorites"></div>
+              </div>
+              <div class="playlist-detail">
+                <div class="playlist-detail-header">
+                  <h4 id="playlist-detail-title">プレイリストを選択</h4>
+                  <p id="playlist-detail-desc">
+                    左側のリストから表示したいプレイリストを選択してください。
+                  </p>
+                </div>
+                <div class="playlist-detail-body" id="playlist-detail-body"></div>
+              </div>
             </div>
           </section>
 

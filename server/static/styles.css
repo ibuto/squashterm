@@ -336,11 +336,47 @@ body {
 
 .playlist-layout {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(240px, 320px) 1fr;
   gap: 20px;
+  align-items: start;
 }
 
-.playlist-card {
+.playlist-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.playlist-create {
+  display: none;
+}
+
+.playlist-create.is-open {
+  display: grid;
+}
+
+.playlist-track-options {
+  display: grid;
+  gap: 10px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.playlist-track-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cbd5f5;
+}
+
+.playlist-track-option input {
+  width: 16px;
+  height: 16px;
+}
+
+.playlist-list,
+.favorites {
   background: #222;
   border-radius: 18px;
   padding: 16px;
@@ -348,25 +384,133 @@ body {
   gap: 12px;
 }
 
-.playlist-card h3 {
+.playlist-section-title {
   margin: 0;
+  font-size: 14px;
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.favorites {
-  background: #333;
+.playlist-item {
+  border: 1px solid transparent;
+  background: #1d1d1d;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  transition: border 0.2s ease, background 0.2s ease;
+}
+
+.playlist-item:hover,
+.playlist-item.is-active {
+  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(37, 99, 235, 0.15);
+}
+
+.playlist-item-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.playlist-item-meta {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.playlist-detail {
+  background: #222;
   border-radius: 18px;
   padding: 16px;
   display: grid;
+  gap: 16px;
+  min-height: 240px;
+}
+
+.playlist-detail-header h4 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.playlist-detail-header p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.playlist-track-list {
+  display: grid;
+  gap: 10px;
+}
+
+.playlist-track-header,
+.playlist-track-row {
+  display: grid;
+  grid-template-columns: 20px 24px 48px 2fr 1.5fr 80px 32px;
+  align-items: center;
   gap: 12px;
 }
 
-.favorites ul {
-  margin: 0;
-  padding-left: 18px;
+.playlist-track-header {
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 12px;
 }
 
-.favorites li {
+.playlist-track-row {
+  background: #1d1d1d;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
+  transition: border 0.2s ease, background 0.2s ease;
+}
+
+.playlist-track-row:hover {
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.playlist-drag-handle {
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  color: #94a3b8;
+}
+
+.playlist-drag-handle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.playlist-track-row.is-dragging {
+  opacity: 0.5;
+}
+
+.playlist-remove {
+  border: none;
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
   cursor: pointer;
+}
+
+.playlist-remove svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.playlist-remove:hover {
+  background: rgba(248, 113, 113, 0.3);
 }
 
 .manage-grid,
@@ -505,7 +649,7 @@ select {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 24px;
+  border-radius: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -569,6 +713,8 @@ select {
   display: flex;
   align-items: center;
   gap: 16px;
+  position: relative;
+  z-index: 3;
 }
 
 .player-controls {
@@ -656,6 +802,7 @@ select {
   pointer-events: none;
   transform: translateY(6px);
   transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 6;
 }
 
 .player-menu-panel.is-open {
@@ -900,7 +1047,7 @@ select {
   }
 
   .player-overlay-content {
-    border-radius: 18px;
+    border-radius: 0;
   }
 
   .player-bottom {
@@ -924,5 +1071,11 @@ select {
   .media-list-artist,
   .media-list-duration {
     font-size: 11px;
+  }
+
+  .playlist-track-header,
+  .playlist-track-row {
+    grid-template-columns: 18px 20px 36px 1.4fr 1fr 60px 28px;
+    gap: 8px;
   }
 }

@@ -5,6 +5,13 @@ const mediaGrid = document.getElementById("media-grid");
 const mediaViewToggle = document.getElementById("media-view-toggle");
 const playlistList = document.getElementById("playlist-list");
 const favorites = document.getElementById("favorites");
+const playlistCreateToggle = document.getElementById("playlist-create-toggle");
+const playlistCreateForm = document.getElementById("playlist-create-form");
+const playlistNameInput = document.getElementById("playlist-name");
+const playlistTrackOptions = document.getElementById("playlist-track-options");
+const playlistDetailTitle = document.getElementById("playlist-detail-title");
+const playlistDetailDesc = document.getElementById("playlist-detail-desc");
+const playlistDetailBody = document.getElementById("playlist-detail-body");
 const tagSelect = document.getElementById("tag-track-select");
 const tagTitleInput = document.getElementById("tag-title");
 const tagArtistInput = document.getElementById("tag-artist");
@@ -60,6 +67,7 @@ const state = {
   tracks: [],
   playlists: [],
   favorites: [],
+  selectedPlaylist: null,
 };
 
 const playerState = {
@@ -141,6 +149,9 @@ const toggleFavorite = () => {
   }
   renderFavorites();
   updateFavoriteButtons();
+  updateFavoritesTracks(state.favorites).catch((error) => {
+    console.error(error);
+  });
 };
 
 const closePlayerMenu = () => {
@@ -195,7 +206,7 @@ const updateMediaViewToggle = () => {
 };
 
 const updateMediaPlayingIndicator = () => {
-  const rows = document.querySelectorAll(".media-list-row");
+  const rows = document.querySelectorAll(".media-list-row, .playlist-track-row");
   if (!rows.length) {
     return;
   }
@@ -466,61 +477,293 @@ const renderMedia = () => {
   });
 };
 
+const renderPlaylistTrackOptions = () => {
+  if (!playlistTrackOptions) {
+    return;
+  }
+  if (state.tracks.length === 0) {
+    playlistTrackOptions.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
+    return;
+  }
+  playlistTrackOptions.innerHTML = state.tracks
+    .map(
+      (track) => `
+        <label class="playlist-track-option">
+          <input type="checkbox" value="${track.id}" />
+          <span>${track.title} / ${track.artist}</span>
+        </label>
+      `
+    )
+    .join("");
+};
+
+const setSelectedPlaylist = (type, playlistId) => {
+  state.selectedPlaylist = { type, id: playlistId };
+  renderPlaylists();
+  renderFavorites();
+  renderPlaylistDetail();
+};
+
+const getSelectedPlaylistData = () => {
+  if (!state.selectedPlaylist) {
+    return null;
+  }
+  if (state.selectedPlaylist.type === "favorites") {
+    return {
+      id: "favorites",
+      name: "お気に入り",
+      track_ids: state.favorites,
+    };
+  }
+  return state.playlists.find((playlist) => playlist.id === state.selectedPlaylist.id);
+};
+
+const buildPlaylistTrackRow = (track, listType) => {
+  const row = document.createElement("div");
+  row.className = "playlist-track-row";
+  row.dataset.trackId = track.id;
+  row.innerHTML = `
+    <span class="playlist-drag-handle" draggable="true" aria-label="並び替え">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="5" y="7" width="14" height="2" rx="1" />
+        <rect x="5" y="15" width="14" height="2" rx="1" />
+      </svg>
+    </span>
+    <span class="media-list-status" aria-hidden="true">
+      <svg class="media-playing-icon" viewBox="0 0 24 24">
+        <polygon points="8,5 19,12 8,19" />
+      </svg>
+    </span>
+    <img class="media-list-cover" src="${track.cover}" alt="${track.album}" />
+    <span class="media-list-title">${track.title}</span>
+    <span class="media-list-artist">${track.artist}</span>
+    <span class="media-list-duration">${track.duration}</span>
+    <button class="playlist-remove" type="button" aria-label="削除">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zm-8 0h2v9H6V9z"
+        />
+      </svg>
+    </button>
+  `;
+  row.addEventListener("click", (event) => {
+    if (
+      event.target.closest(".playlist-remove") ||
+      event.target.closest(".playlist-drag-handle")
+    ) {
+      return;
+    }
+    const index = state.tracks.findIndex((item) => item.id === track.id);
+    if (index >= 0) {
+      setTrackByIndex(index);
+      togglePlayback();
+    }
+  });
+  row
+    .querySelector(".playlist-drag-handle")
+    .addEventListener("dragstart", (event) => {
+      row.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", track.id);
+    });
+  row
+    .querySelector(".playlist-drag-handle")
+    .addEventListener("dragend", () => {
+      row.classList.remove("is-dragging");
+    });
+  row.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  });
+  row.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const draggedId = event.dataTransfer.getData("text/plain");
+    if (!draggedId || draggedId === track.id) {
+      return;
+    }
+    reorderPlaylistTracks(listType, draggedId, track.id);
+  });
+  row.querySelector(".playlist-remove").addEventListener("click", () => {
+    removePlaylistTrack(listType, track.id);
+  });
+  return row;
+};
+
+const renderPlaylistDetail = () => {
+  if (!playlistDetailBody || !playlistDetailTitle || !playlistDetailDesc) {
+    return;
+  }
+  playlistDetailBody.innerHTML = "";
+  const selected = getSelectedPlaylistData();
+  if (!selected) {
+    playlistDetailTitle.textContent = "プレイリストを選択";
+    playlistDetailDesc.textContent =
+      "左側のリストから表示したいプレイリストを選択してください。";
+    return;
+  }
+  playlistDetailTitle.textContent = selected.name;
+  playlistDetailDesc.textContent = `収録曲数: ${selected.track_ids.length}`;
+  if (selected.track_ids.length === 0) {
+    playlistDetailBody.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "playlist-track-list";
+  list.innerHTML = `
+    <div class="playlist-track-header">
+      <span></span>
+      <span></span>
+      <span>アート</span>
+      <span>タイトル</span>
+      <span>アーティスト</span>
+      <span>再生時間</span>
+      <span></span>
+    </div>
+  `;
+  selected.track_ids.forEach((trackId) => {
+    const track = state.tracks.find((item) => item.id === trackId);
+    if (!track) {
+      return;
+    }
+    list.appendChild(
+      buildPlaylistTrackRow(track, selected.id === "favorites" ? "favorites" : "playlist")
+    );
+  });
+  playlistDetailBody.appendChild(list);
+  updateMediaPlayingIndicator();
+};
+
 const renderPlaylists = () => {
   playlistList.innerHTML = "";
+  const title = document.createElement("h4");
+  title.className = "playlist-section-title";
+  title.textContent = "プレイリスト";
+  playlistList.appendChild(title);
   if (state.playlists.length === 0) {
-    playlistList.innerHTML = '<div class="empty-state">項目が存在しません。</div>';
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "項目が存在しません。";
+    playlistList.appendChild(empty);
     return;
   }
   state.playlists.forEach((playlist) => {
-    const trackNames = playlist.track_ids
-      .map((id) => state.tracks.find((track) => track.id === id))
-      .filter(Boolean)
-      .map((track) => `${track.title} / ${track.artist}`);
-
-    const card = document.createElement("div");
-    card.className = "playlist-card";
-    card.innerHTML = `
-      <h3>${playlist.name}</h3>
-      <p>収録曲数: ${playlist.track_ids.length}</p>
-      <ul>
-        ${trackNames.map((name) => `<li>${name}</li>`).join("")}
-      </ul>
-      <button class="secondary" type="button">再生キューへ送る</button>
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "playlist-item";
+    if (
+      state.selectedPlaylist?.type === "playlist" &&
+      state.selectedPlaylist?.id === playlist.id
+    ) {
+      button.classList.add("is-active");
+    }
+    button.innerHTML = `
+      <span class="playlist-item-title">${playlist.name}</span>
+      <span class="playlist-item-meta">収録曲数: ${playlist.track_ids.length}</span>
     `;
-    playlistList.appendChild(card);
+    button.addEventListener("click", () => {
+      setSelectedPlaylist("playlist", playlist.id);
+    });
+    playlistList.appendChild(button);
   });
 };
 
 const renderFavorites = () => {
-  favorites.innerHTML = `
-    <h3>お気に入り</h3>
-    <p>よく聴く楽曲のショートカット。</p>
+  favorites.innerHTML = "";
+  const title = document.createElement("h4");
+  title.className = "playlist-section-title";
+  title.textContent = "お気に入り";
+  favorites.appendChild(title);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "playlist-item";
+  if (state.selectedPlaylist?.type === "favorites") {
+    button.classList.add("is-active");
+  }
+  button.innerHTML = `
+    <span class="playlist-item-title">お気に入り</span>
+    <span class="playlist-item-meta">登録数: ${state.favorites.length}</span>
   `;
-  const favoriteTracks = state.favorites
-    .map((id) => state.tracks.find((track) => track.id === id))
-    .filter(Boolean);
-  if (favoriteTracks.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = "項目が存在しません。";
-    favorites.appendChild(empty);
+  button.addEventListener("click", () => {
+    setSelectedPlaylist("favorites", "favorites");
+  });
+  favorites.appendChild(button);
+};
+
+const reorderTrackIds = (trackIds, draggedId, targetId) => {
+  const fromIndex = trackIds.indexOf(draggedId);
+  const toIndex = trackIds.indexOf(targetId);
+  if (fromIndex < 0 || toIndex < 0) {
+    return trackIds;
+  }
+  const updated = [...trackIds];
+  updated.splice(fromIndex, 1);
+  updated.splice(toIndex, 0, draggedId);
+  return updated;
+};
+
+const updatePlaylistTracks = async (playlistId, trackIds) => {
+  await requestJson(`/api/playlists/${playlistId}`, { track_ids: trackIds }, "PUT");
+};
+
+const updateFavoritesTracks = async (trackIds) => {
+  await requestJson("/api/favorites", { track_ids: trackIds }, "PUT");
+};
+
+const reorderPlaylistTracks = async (listType, draggedId, targetId) => {
+  const selected = getSelectedPlaylistData();
+  if (!selected) {
     return;
   }
-  const list = document.createElement("ul");
-  favoriteTracks.forEach((track) => {
-    const item = document.createElement("li");
-    item.textContent = `${track.title} / ${track.artist}`;
-    item.addEventListener("click", () => {
-      const index = state.tracks.findIndex((itemTrack) => itemTrack.id === track.id);
-      if (index >= 0) {
-        setTrackByIndex(index);
-        togglePlayback();
+  const updatedTrackIds = reorderTrackIds(selected.track_ids, draggedId, targetId);
+  if (updatedTrackIds === selected.track_ids) {
+    return;
+  }
+  try {
+    if (listType === "favorites") {
+      state.favorites = updatedTrackIds;
+      await updateFavoritesTracks(updatedTrackIds);
+      updateFavoriteButtons();
+    } else {
+      const playlist = state.playlists.find((item) => item.id === selected.id);
+      if (!playlist) {
+        return;
       }
-    });
-    list.appendChild(item);
-  });
-  favorites.appendChild(list);
+      playlist.track_ids = updatedTrackIds;
+      await updatePlaylistTracks(playlist.id, updatedTrackIds);
+    }
+    renderPlaylistDetail();
+    renderPlaylists();
+    renderFavorites();
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const removePlaylistTrack = async (listType, trackId) => {
+  const selected = getSelectedPlaylistData();
+  if (!selected) {
+    return;
+  }
+  const updatedTrackIds = selected.track_ids.filter((id) => id !== trackId);
+  try {
+    if (listType === "favorites") {
+      state.favorites = updatedTrackIds;
+      await updateFavoritesTracks(updatedTrackIds);
+      updateFavoriteButtons();
+    } else {
+      const playlist = state.playlists.find((item) => item.id === selected.id);
+      if (!playlist) {
+        return;
+      }
+      playlist.track_ids = updatedTrackIds;
+      await updatePlaylistTracks(playlist.id, updatedTrackIds);
+    }
+    renderPlaylistDetail();
+    renderPlaylists();
+    renderFavorites();
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 const renderTagOptions = () => {
@@ -644,6 +887,19 @@ const updateMediaSessionPosition = () => {
   }
 };
 
+const ensureSelectedPlaylist = () => {
+  if (!state.selectedPlaylist) {
+    state.selectedPlaylist = { type: "favorites", id: "favorites" };
+    return;
+  }
+  if (
+    state.selectedPlaylist.type === "playlist" &&
+    !state.playlists.find((playlist) => playlist.id === state.selectedPlaylist.id)
+  ) {
+    state.selectedPlaylist = { type: "favorites", id: "favorites" };
+  }
+};
+
 const fetchJson = async (path) => {
   const response = await fetch(path);
   if (!response.ok) {
@@ -665,6 +921,22 @@ const postJson = async (path, payload) => {
   return response.json();
 };
 
+const requestJson = async (path, payload, method) => {
+  const response = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: payload ? JSON.stringify(payload) : undefined,
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Failed to ${method} ${path}`);
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  return response.json();
+};
+
 const refreshLibrary = async () => {
   const [tracks, playlists, favoritesData] = await Promise.all([
     fetchJson("/api/library"),
@@ -674,10 +946,13 @@ const refreshLibrary = async () => {
   state.tracks = tracks;
   state.playlists = playlists;
   state.favorites = favoritesData;
+  ensureSelectedPlaylist();
   renderMedia();
   updateMediaViewToggle();
   renderPlaylists();
   renderFavorites();
+  renderPlaylistTrackOptions();
+  renderPlaylistDetail();
   renderTagOptions();
   updatePlayerUI();
   updateFavoriteButtons();
@@ -720,6 +995,40 @@ const handleImportSubmit = async () => {
   }
 };
 
+const handlePlaylistCreate = async () => {
+  if (!playlistNameInput || !playlistTrackOptions) {
+    return;
+  }
+  const name = playlistNameInput.value.trim();
+  if (!name) {
+    return;
+  }
+  const selectedTrackIds = Array.from(
+    playlistTrackOptions.querySelectorAll("input[type='checkbox']:checked")
+  ).map((input) => input.value);
+  try {
+    const playlist = await requestJson(
+      "/api/playlists",
+      { name, track_ids: selectedTrackIds },
+      "POST"
+    );
+    state.playlists.push(playlist);
+    playlistNameInput.value = "";
+    playlistTrackOptions
+      .querySelectorAll("input[type='checkbox']")
+      .forEach((input) => {
+        input.checked = false;
+      });
+    if (playlistCreateForm) {
+      playlistCreateForm.classList.remove("is-open");
+      playlistCreateForm.setAttribute("aria-hidden", "true");
+    }
+    setSelectedPlaylist("playlist", playlist.id);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 const init = async () => {
   try {
     const [tracks, playlists, favoritesData, status, settings, system] =
@@ -735,11 +1044,14 @@ const init = async () => {
     state.tracks = tracks;
     state.playlists = playlists;
     state.favorites = favoritesData;
+    ensureSelectedPlaylist();
 
     renderMedia();
     updateMediaViewToggle();
     renderPlaylists();
     renderFavorites();
+    renderPlaylistTrackOptions();
+    renderPlaylistDetail();
     renderTagOptions();
     updatePlayerUI();
     updateFavoriteButtons();
@@ -773,6 +1085,20 @@ if (importForm) {
   importForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleImportSubmit();
+  });
+}
+
+if (playlistCreateToggle && playlistCreateForm) {
+  playlistCreateToggle.addEventListener("click", () => {
+    const isOpen = playlistCreateForm.classList.toggle("is-open");
+    playlistCreateForm.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  });
+}
+
+if (playlistCreateForm) {
+  playlistCreateForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    handlePlaylistCreate();
   });
 }
 
