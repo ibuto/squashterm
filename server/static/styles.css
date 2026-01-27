@@ -72,6 +72,12 @@ body {
   transition: all 0.2s ease;
 }
 
+.nav-button .nav-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 .nav-button .icon {
   font-size: 18px;
 }
@@ -1001,6 +1007,20 @@ select {
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-menu-action svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.player-menu-action.is-danger {
+  color: #f87171;
 }
 
 .player-menu-panel button:disabled {
