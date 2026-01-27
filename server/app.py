@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse, urlunparse
 
 # --- 新しいライブラリのインポート ---
-from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -825,6 +825,20 @@ def update_playlist(playlist_id: str, payload: PlaylistUpdate):
         playlist["auto_sync_enabled"] = payload.auto_sync_enabled
     _save_library(data)
     return playlist
+
+@app.delete("/api/playlists/{playlist_id}", status_code=204)
+def delete_playlist(playlist_id: str):
+    data = _load_library()
+    playlists = data.get("playlists", [])
+    target_index = next(
+        (index for index, item in enumerate(playlists) if item.get("id") == playlist_id),
+        None,
+    )
+    if target_index is None:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    playlists.pop(target_index)
+    _save_library(data)
+    return Response(status_code=204)
 
 @app.post("/api/playlists/{playlist_id}/sync")
 def sync_playlist(playlist_id: str):

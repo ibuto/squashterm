@@ -415,6 +415,16 @@ const updatePlayerUI = () => {
   updatePlayerMenuButtons();
 };
 
+const closePlayerOverlay = () => {
+  if (playerOverlay) {
+    playerOverlay.classList.remove("is-active");
+    playerOverlay.setAttribute("aria-hidden", "true");
+  }
+  closePlayerMenu();
+};
+
+const isPlayerOverlayActive = () => playerOverlay?.classList.contains("is-active");
+
 const openPlayerOverlay = () => {
   if (playerOverlay) {
     playerOverlay.classList.add("is-active");
@@ -886,23 +896,92 @@ const renderPlaylists = () => {
     return;
   }
   visiblePlaylists.forEach((playlist) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "playlist-item";
+    const item = document.createElement("div");
+    item.className = "playlist-item";
     if (
       state.selectedPlaylist?.type === "playlist" &&
       state.selectedPlaylist?.id === playlist.id
     ) {
-      button.classList.add("is-active");
+      item.classList.add("is-active");
     }
-    button.innerHTML = `
+    const mainButton = document.createElement("button");
+    mainButton.type = "button";
+    mainButton.className = "playlist-item-main";
+    mainButton.innerHTML = `
       <span class="playlist-item-title">${playlist.name}</span>
       <span class="playlist-item-meta">収録曲数: ${playlist.track_ids.length}</span>
     `;
-    button.addEventListener("click", () => {
+    mainButton.addEventListener("click", () => {
       setSelectedPlaylist("playlist", playlist.id);
     });
-    playlistList.appendChild(button);
+    const actions = document.createElement("div");
+    actions.className = "playlist-item-actions";
+    const renameButton = document.createElement("button");
+    renameButton.type = "button";
+    renameButton.className = "icon-button playlist-action playlist-rename";
+    renameButton.setAttribute("aria-label", "プレイリスト名を変更");
+    renameButton.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M4 16.5V20h3.5l10-10-3.5-3.5-10 10zM19.5 7l-2.5-2.5 1.5-1.5a1 1 0 0 1 1.4 0l1.1 1.1a1 1 0 0 1 0 1.4L19.5 7z"
+        />
+      </svg>
+    `;
+    renameButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const nextName = window.prompt("新しいプレイリスト名を入力してください。", playlist.name);
+      if (!nextName) {
+        return;
+      }
+      const trimmedName = nextName.trim();
+      if (!trimmedName || trimmedName === playlist.name) {
+        return;
+      }
+      try {
+        const updated = await updatePlaylistSettings(playlist.id, { name: trimmedName });
+        const targetIndex = state.playlists.findIndex((item) => item.id === updated.id);
+        if (targetIndex >= 0) {
+          state.playlists[targetIndex] = updated;
+        }
+        renderPlaylists();
+        renderPlaylistDetail();
+      } catch (error) {
+        console.error(error);
+      }
+    });
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "icon-button playlist-action playlist-delete";
+    deleteButton.setAttribute("aria-label", "プレイリストを削除");
+    deleteButton.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M7 6h10l-1 14H8L7 6zm9.5-3H7.5l-1 2H4v2h16V5h-2.5l-1-2z"
+        />
+      </svg>
+    `;
+    deleteButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const confirmed = window.confirm(`プレイリスト「${playlist.name}」を削除しますか？`);
+      if (!confirmed) {
+        return;
+      }
+      try {
+        await deletePlaylist(playlist.id);
+        state.playlists = state.playlists.filter((item) => item.id !== playlist.id);
+        ensureSelectedPlaylist();
+        renderPlaylists();
+        renderPlaylistDetail();
+        renderFavorites();
+      } catch (error) {
+        console.error(error);
+      }
+    });
+    actions.appendChild(renameButton);
+    actions.appendChild(deleteButton);
+    item.appendChild(mainButton);
+    item.appendChild(actions);
+    playlistList.appendChild(item);
   });
 };
 
@@ -914,7 +993,7 @@ const renderFavorites = () => {
   favorites.appendChild(title);
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "playlist-item";
+  button.className = "playlist-item playlist-item-main-only";
   if (state.selectedPlaylist?.type === "favorites") {
     button.classList.add("is-active");
   }
@@ -1043,6 +1122,10 @@ const reorderTrackIds = (trackIds, draggedId, targetId) => {
 
 const updatePlaylistTracks = async (playlistId, trackIds) => {
   await requestJson(`/api/playlists/${playlistId}`, { track_ids: trackIds }, "PUT");
+};
+
+const deletePlaylist = async (playlistId) => {
+  await requestJson(`/api/playlists/${playlistId}`, null, "DELETE");
 };
 
 const updatePlaylistSettings = async (playlistId, payload) => {
@@ -1181,11 +1264,25 @@ const activateTab = (tabName) => {
 const renderSettings = (settings) => {
   if (settingsVersionList) {
     const version = settings?.version || {};
-    settingsVersionList.innerHTML = [
-      `<li>アプリ: <strong>${version.app || "--"}</strong></li>`,
-      `<li>API: <strong>${version.api || "--"}</strong></li>`,
-      `<li>ビルド: <strong>${version.build || "--"}</strong></li>`,
-    ].join("");
+    settingsVersionList.innerHTML = `
+      <li class="settings-version-item">
+        <img class="settings-version-logo" src="/static/images/logo.png" alt="SquashTerm logo" />
+        <div class="settings-version-values">
+          <div class="settings-version-row">
+            <span class="settings-version-label">アプリ</span>
+            <strong>${version.app || "--"}</strong>
+          </div>
+          <div class="settings-version-row">
+            <span class="settings-version-label">API</span>
+            <strong>${version.api || "--"}</strong>
+          </div>
+          <div class="settings-version-row">
+            <span class="settings-version-label">ビルド</span>
+            <strong>${version.build || "--"}</strong>
+          </div>
+        </div>
+      </li>
+    `;
   }
   if (settingsPlaybackOptions) {
     const options = settings?.playback_options || [];
@@ -1745,6 +1842,9 @@ if (audioPlayer) {
       playNext();
       return;
     }
+    if (isPlayerOverlayActive()) {
+      closePlayerOverlay();
+    }
     stopPlayback();
   });
 }
@@ -1871,11 +1971,7 @@ if (miniExpand) {
 
 if (playerClose) {
   playerClose.addEventListener("click", () => {
-    if (playerOverlay) {
-      playerOverlay.classList.remove("is-active");
-      playerOverlay.setAttribute("aria-hidden", "true");
-    }
-    closePlayerMenu();
+    closePlayerOverlay();
   });
 }
 
@@ -2016,6 +2112,24 @@ document.addEventListener("click", (event) => {
     !playerMenuToggle.contains(event.target)
   ) {
     closePlayerMenu();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!isPlayerOverlayActive()) {
+    return;
+  }
+  const tagName = event.target?.tagName?.toLowerCase();
+  if (tagName === "input" || tagName === "textarea" || event.target?.isContentEditable) {
+    return;
+  }
+  if (event.key === "Escape") {
+    closePlayerOverlay();
+    return;
+  }
+  if (event.code === "Space" || event.key === " ") {
+    event.preventDefault();
+    togglePlayback();
   }
 });
 
