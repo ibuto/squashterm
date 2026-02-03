@@ -693,7 +693,8 @@ body {
 }
 
 label {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   font-size: 14px;
   color: #e2e8f0;
@@ -715,10 +716,15 @@ input[type="checkbox"],
 input[type="radio"] {
   width: auto;
   padding: 0;
+  flex-shrink: 0;
 }
 
 input[type="number"] {
   max-width: 150px;
+}
+
+input[type="file"] {
+  padding: 8px 12px;
 }
 
 .batch-size-input {
