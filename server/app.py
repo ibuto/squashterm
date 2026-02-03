@@ -592,7 +592,6 @@ def _build_system_payload() -> dict:
 def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
     command = [
         "yt-dlp",
-        "--no-playlist",
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
@@ -633,7 +632,6 @@ def _build_ytdlp_command(url: str) -> list[str]:
         "yt-dlp",
         "--newline",
         "--progress",
-        "--no-playlist",
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
@@ -743,8 +741,24 @@ def _download_single_track_from_url(url: str, playlist_id: str | None = None) ->
 
 def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_size: int = 5):
     """プレイリストを分割して並列ダウンロード（ジェネレーター）"""
+    import sys
+    print(f"[DEBUG] _batch_download_playlist called with url: {url}", file=sys.stderr, flush=True)
+    
+    # 最初のyieldで実行を開始させる
+    yield {"type": "start", "message": "プレイリスト取得中..."}
+    
     # プレイリストのエントリを取得
-    entries = _fetch_flat_playlist_entries(url)
+    try:
+        print(f"[DEBUG] Fetching playlist entries...", file=sys.stderr, flush=True)
+        entries = _fetch_flat_playlist_entries(url)
+        print(f"[DEBUG] Fetched {len(entries)} entries", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"[DEBUG] Error fetching entries: {e}", file=sys.stderr, flush=True)
+        yield {
+            "type": "error",
+            "message": f"エントリ取得エラー: {str(e)}",
+        }
+        return
     
     if not entries:
         yield {
@@ -754,6 +768,7 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
         return
     
     total = len(entries)
+    print(f"[DEBUG] Total entries: {total}, creating download queue", file=sys.stderr, flush=True)
     yield {
         "type": "playlist_info",
         "total": total,
@@ -761,7 +776,9 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
     }
     
     # ダウンロードキューを作成
+    print(f"[DEBUG] Creating download queue with batch_size={batch_size}", file=sys.stderr, flush=True)
     queue = create_download_queue(max_workers=batch_size)
+    print(f"[DEBUG] Queue created: {type(queue).__name__}", file=sys.stderr, flush=True)
     
     downloaded_tracks = []
     completed = 0
@@ -780,12 +797,14 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
     
     # プレイリストダウンロードを開始
     try:
+        print(f"[DEBUG] Calling queue.enqueue_playlist with {len(entries)} entries", file=sys.stderr, flush=True)
         task_id = queue.enqueue_playlist(
             entries=entries,
             download_func=_download_single_track_from_url,
             playlist_id=playlist_id,
             progress_callback=progress_callback,
         )
+        print(f"[DEBUG] enqueue_playlist returned task_id: {task_id}", file=sys.stderr, flush=True)
         
         # 進捗を監視
         while completed + failed < total:

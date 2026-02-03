@@ -8,7 +8,7 @@ Redisが利用可能な場合はRedisベースのキューを、
 import os
 import json
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Any
 from dataclasses import dataclass
 
@@ -48,6 +48,7 @@ class ThreadPoolDownloadQueue(DownloadQueue):
     def __init__(self, max_workers: int = 5):
         self.max_workers = max_workers
         self._active_tasks = {}
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
     
     def enqueue_playlist(
         self,
@@ -65,11 +66,21 @@ class ThreadPoolDownloadQueue(DownloadQueue):
             "completed": 0,
             "failed": 0,
             "results": [],
+            "futures": [],
         }
         
         def process_entry(entry: dict, index: int):
             """単一エントリのダウンロード処理"""
-            url = entry.get("url") or f"https://www.youtube.com/watch?v={entry.get('id')}"
+            # URLを適切に抽出
+            url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+            if not url:
+                # IDからYouTube URLを生成
+                ie_key = str(entry.get("ie_key") or "").lower()
+                if ie_key in {"youtube", "youtubeweb"}:
+                    url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                else:
+                    url = entry.get("url", "")
+            
             task = DownloadTask(
                 task_id=task_id,
                 url=url,
@@ -80,7 +91,9 @@ class ThreadPoolDownloadQueue(DownloadQueue):
             )
             
             try:
+                print(f"[DEBUG] Downloading: {url}")
                 result = download_func(url, playlist_id)
+                print(f"[DEBUG] Downloaded successfully: {url}")
                 self._active_tasks[task_id]["completed"] += 1
                 self._active_tasks[task_id]["results"].append(result)
                 
@@ -89,30 +102,30 @@ class ThreadPoolDownloadQueue(DownloadQueue):
                 
                 return result
             except Exception as exc:
+                print(f"[DEBUG] Error downloading {url}: {exc}")
                 self._active_tasks[task_id]["failed"] += 1
                 if progress_callback:
                     progress_callback(task, {"error": str(exc)})
-                raise
+                return {"error": str(exc)}
         
-        # 並列ダウンロード実行
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(process_entry, entry, idx): idx
-                for idx, entry in enumerate(entries)
-            }
-            
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception:
-                    # エラーは記録済みなので続行
-                    pass
+        # 各エントリを非同期にサブミット
+        print(f"[DEBUG] Submitting {len(entries)} tasks to ThreadPoolExecutor")
+        for idx, entry in enumerate(entries):
+            future = self._executor.submit(process_entry, entry, idx)
+            self._active_tasks[task_id]["futures"].append(future)
+            print(f"[DEBUG] Submitted task {idx+1}/{len(entries)}")
         
+        print(f"[DEBUG] All tasks submitted. Task ID: {task_id}")
         return task_id
     
     def get_status(self, task_id: str) -> dict:
         """タスクの進捗状況を取得"""
-        return self._active_tasks.get(task_id, {})
+        task_data = self._active_tasks.get(task_id, {})
+        return {
+            "total": task_data.get("total", 0),
+            "completed": task_data.get("completed", 0),
+            "failed": task_data.get("failed", 0),
+        }
 
 
 class RedisDownloadQueue(DownloadQueue):
@@ -152,7 +165,16 @@ class RedisDownloadQueue(DownloadQueue):
         
         # 各エントリをキューに追加
         for idx, entry in enumerate(entries):
-            url = entry.get("url") or f"https://www.youtube.com/watch?v={entry.get('id')}"
+            # URLを適切に抽出
+            url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+            if not url:
+                # IDからYouTube URLを生成
+                ie_key = str(entry.get("ie_key") or "").lower()
+                if ie_key in {"youtube", "youtubeweb"}:
+                    url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                else:
+                    url = entry.get("url", "")
+            
             task_data = {
                 "task_id": task_id,
                 "url": url,
