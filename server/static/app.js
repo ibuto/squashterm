@@ -1277,7 +1277,7 @@ const renderSettings = (settings) => {
         <img class="settings-version-logo" src="/static/images/logo.png" alt="SquashTerm logo" />
         <div class="settings-version-values">
           <div class="settings-version-row">
-            <span class="settings-version-label">アプリ</span>
+            <span class="settings-version-label">バージョン</span>
             <strong>${version.app || "--"}</strong>
           </div>
           <div class="settings-version-row">
@@ -1285,7 +1285,7 @@ const renderSettings = (settings) => {
             <strong>${version.api || "--"}</strong>
           </div>
           <div class="settings-version-row">
-            <span class="settings-version-label">ビルド</span>
+            <span class="settings-version-label">ビルド日時</span>
             <strong>${version.build || "--"}</strong>
           </div>
         </div>
