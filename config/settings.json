@@ -1,0 +1,25 @@
+{
+  "app": {
+    "name": "SquashTerm",
+    "version": "0.1.0",
+    "api": "FastAPI",
+    "build": "2024.11.18"
+  },
+  "device": "Raspberry Pi (prototype)",
+  "storage": {
+    "used_gb": 3.8,
+    "total_gb": 9.0
+  },
+  "playback_options": [
+    {
+      "id": "allow_remote",
+      "label": "ネットワークからのアクセスを許可",
+      "enabled": true
+    },
+    {
+      "id": "auto_scan",
+      "label": "自動ライブラリスキャン",
+      "enabled": false
+    }
+  ]
+}

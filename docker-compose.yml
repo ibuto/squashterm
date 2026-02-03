@@ -1,0 +1,23 @@
+services:
+  squashterm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8000"
+    volumes:
+      # データ永続化用のボリューム
+      - /mnt/hdd4/squashterm-data:/app/server/data
+      - ./config:/app/server/config
+      # 開発時のコード変更を反映（オプション）
+      # - ./server:/app/server
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
