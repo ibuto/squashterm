@@ -30,6 +30,53 @@
 4. feature/upstream から上流へPR作成
 ```
 
+### 変更の反映ルール
+
+**feature/upstreamで変更した場合:**
+1. feature/upstreamにコミット・プッシュ
+2. mainにマージまたはcherry-pick
+3. feature/customにもcherry-pick（標準機能の修正なので両方に必要）
+
+```bash
+# 例: feature/upstreamでCSS修正
+git checkout feature/upstream
+git add server/static/styles.css
+git commit -m "fix: CSSの修正"
+git push fork feature/upstream
+
+# mainに反映
+git checkout main
+git merge --no-ff feature/upstream
+
+# customにも反映
+git checkout feature/custom
+git cherry-pick <commit-hash>
+git push fork feature/custom
+```
+
+**feature/customで変更した場合:**
+1. feature/customにコミット・プッシュ
+2. mainにマージまたはcherry-pick
+3. 必要に応じてfeature/upstreamにもcherry-pick（独自機能でない場合のみ）
+
+```bash
+# 例: feature/customで独自機能追加
+git checkout feature/custom
+git add docker-compose.yml
+git commit -m "feat: Redis設定追加"
+git push fork feature/custom
+
+# mainに反映
+git checkout main
+git merge --no-ff feature/custom
+
+# upstreamには反映しない（独自機能のため）
+```
+
+**両方に共通する変更の場合:**
+- feature/upstreamで実装して両方に反映するのが推奨
+- または、両ブランチで個別にコミット
+
 ## コミット方針
 
 ### コミットの分割
