@@ -89,7 +89,8 @@ class ImportRequest(BaseModel):
 class PlaylistBatchImportRequest(BaseModel):
     url: str
     playlist_id: str | None = None
-    batch_size: int = 5
+    concurrency: int = 10  # batch_size から concurrency に名称変更
+    auto_tag: bool | None = None
 
 class PlaylistCreate(BaseModel):
     name: str
@@ -627,8 +628,8 @@ def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
         raise RuntimeError("yt-dlp did not return metadata")
     return infos, log_output
 
-def _build_ytdlp_command(url: str) -> list[str]:
-    return [
+def _build_ytdlp_command(url: str, no_playlist: bool = False) -> list[str]:
+    cmd = [
         "yt-dlp",
         "--newline",
         "--progress",
@@ -640,8 +641,11 @@ def _build_ytdlp_command(url: str) -> list[str]:
         "mp3",
         "-o",
         str(MEDIA_DIR / "%(id)s.%(ext)s"),
-        url,
     ]
+    if no_playlist:
+        cmd.append("--no-playlist")
+    cmd.append(url)
+    return cmd
 
 def _parse_progress(line: str) -> float | None:
     match = re.search(r"\[download\]\s+(\d+(?:\.\d+)?)%", line)
@@ -652,8 +656,8 @@ def _parse_progress(line: str) -> float | None:
     except ValueError:
         return None
 
-def _iter_ytdlp_events(url: str, playlist_id: str | None = None):
-    command = _build_ytdlp_command(url)
+def _iter_ytdlp_events(url: str, playlist_id: str | None = None, no_playlist: bool = False):
+    command = _build_ytdlp_command(url, no_playlist=no_playlist)
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -665,6 +669,10 @@ def _iter_ytdlp_events(url: str, playlist_id: str | None = None):
         raise RuntimeError("yt-dlp did not return output")
     infos: list[dict] = []
     log_lines: list[str] = []
+    
+    # 単体ダウンロードの場合は total=1, completed=0 からスタート
+    yield {"type": "start", "total": 1, "completed": 0, "message": "ダウンロード準備中..."}
+    
     for raw_line in process.stdout:
         line = raw_line.strip()
         if not line:
@@ -679,10 +687,10 @@ def _iter_ytdlp_events(url: str, playlist_id: str | None = None):
             infos.append(parsed)
             continue
         log_lines.append(line)
-        yield {"type": "log", "message": line}
+        yield {"type": "log", "message": line, "total": 1, "completed": 0}
         progress_value = _parse_progress(line)
         if progress_value is not None:
-            yield {"type": "progress", "value": progress_value, "message": line}
+            yield {"type": "progress", "value": progress_value, "message": line, "total": 1, "completed": 0}
     process.wait()
     if process.returncode != 0:
         error_message = "\n".join(log_lines[-8:]) or "yt-dlp failed"
@@ -695,6 +703,9 @@ def _iter_ytdlp_events(url: str, playlist_id: str | None = None):
     yield {
         "type": "complete",
         "tracks": [asdict(track) for track in tracks],
+        "total": len(tracks),
+        "completed": len(tracks),
+        "failed": 0,
     }
 
 def _store_downloaded_tracks(
@@ -741,19 +752,13 @@ def _download_single_track_from_url(url: str, playlist_id: str | None = None) ->
 
 def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_size: int = 5):
     """プレイリストを分割して並列ダウンロード（ジェネレーター）"""
-    import sys
-    print(f"[DEBUG] _batch_download_playlist called with url: {url}", file=sys.stderr, flush=True)
-    
     # 最初のyieldで実行を開始させる
     yield {"type": "start", "message": "プレイリスト取得中..."}
     
     # プレイリストのエントリを取得
     try:
-        print(f"[DEBUG] Fetching playlist entries...", file=sys.stderr, flush=True)
         entries = _fetch_flat_playlist_entries(url)
-        print(f"[DEBUG] Fetched {len(entries)} entries", file=sys.stderr, flush=True)
     except Exception as e:
-        print(f"[DEBUG] Error fetching entries: {e}", file=sys.stderr, flush=True)
         yield {
             "type": "error",
             "message": f"エントリ取得エラー: {str(e)}",
@@ -768,7 +773,6 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
         return
     
     total = len(entries)
-    print(f"[DEBUG] Total entries: {total}, creating download queue", file=sys.stderr, flush=True)
     yield {
         "type": "playlist_info",
         "total": total,
@@ -776,9 +780,7 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
     }
     
     # ダウンロードキューを作成
-    print(f"[DEBUG] Creating download queue with batch_size={batch_size}", file=sys.stderr, flush=True)
     queue = create_download_queue(max_workers=batch_size)
-    print(f"[DEBUG] Queue created: {type(queue).__name__}", file=sys.stderr, flush=True)
     
     downloaded_tracks = []
     completed = 0
@@ -797,14 +799,12 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
     
     # プレイリストダウンロードを開始
     try:
-        print(f"[DEBUG] Calling queue.enqueue_playlist with {len(entries)} entries", file=sys.stderr, flush=True)
         task_id = queue.enqueue_playlist(
             entries=entries,
             download_func=_download_single_track_from_url,
             playlist_id=playlist_id,
             progress_callback=progress_callback,
         )
-        print(f"[DEBUG] enqueue_playlist returned task_id: {task_id}", file=sys.stderr, flush=True)
         
         # 進捗を監視
         while completed + failed < total:
@@ -1061,15 +1061,63 @@ def import_track_stream(payload: ImportRequest):
 
 @app.post("/api/library/import/playlist-batch")
 def import_playlist_batch(payload: PlaylistBatchImportRequest):
-    """プレイリストを分割して並列ダウンロード（SSE）"""
+    """プレイリスト自動判定ダウンロード（SSE）"""
     def event_generator():
         try:
-            for event in _batch_download_playlist(
-                payload.url,
-                payload.playlist_id,
-                payload.batch_size
-            ):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': 'URLを解析中...'}, ensure_ascii=False)}\n\n"
+            
+            # URLを解析して判定
+            parsed = urlparse(payload.url)
+            query_params = parse_qs(parsed.query)
+            is_single_video = False
+            
+            # YouTubeの判定
+            if 'youtube.com' in parsed.netloc or 'youtu.be' in parsed.netloc:
+                # v= パラメータがある場合は単体動画（list=があっても無視）
+                if 'v' in query_params:
+                    is_single_video = True
+                    yield f"data: {json.dumps({'type': 'log', 'message': '単体動画として検出しました'}, ensure_ascii=False)}\n\n"
+                # /playlist パスまたは list= のみの場合はプレイリスト
+                elif '/playlist' in parsed.path or 'list' in query_params:
+                    is_single_video = False
+                    yield f"data: {json.dumps({'type': 'log', 'message': 'プレイリストとして検出しました'}, ensure_ascii=False)}\n\n"
+            # SoundCloudの単体トラック判定（/sets/が含まれていない）
+            elif 'soundcloud.com' in parsed.netloc:
+                if '/sets/' in parsed.path:
+                    is_single_video = False
+                    yield f"data: {json.dumps({'type': 'log', 'message': 'プレイリストとして検出しました'}, ensure_ascii=False)}\n\n"
+                else:
+                    is_single_video = True
+                    yield f"data: {json.dumps({'type': 'log', 'message': '単体トラックとして検出しました'}, ensure_ascii=False)}\n\n"
+            
+            if is_single_video:
+                # 単体動画：通常ダウンロード（--no-playlistフラグ付き）
+                yield f"data: {json.dumps({'type': 'log', 'message': '通常ダウンロードを開始'}, ensure_ascii=False)}\n\n"
+                for event in _iter_ytdlp_events(payload.url, payload.playlist_id, no_playlist=True):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            else:
+                # プレイリスト：曲数を確認
+                cmd = ["yt-dlp", "--flat-playlist", "--dump-json", payload.url]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                
+                if result.returncode != 0:
+                    raise Exception(f"yt-dlp failed: {result.stderr}")
+                
+                # エントリー数をカウント
+                entries = [line for line in result.stdout.strip().split("\n") if line]
+                entry_count = len(entries)
+                
+                yield f"data: {json.dumps({'type': 'log', 'message': f'プレイリスト: {entry_count}曲を検出'}, ensure_ascii=False)}\n\n"
+                
+                # 並列ダウンロード
+                yield f"data: {json.dumps({'type': 'log', 'message': f'並列ダウンロードを開始（並列度: {payload.concurrency}）'}, ensure_ascii=False)}\n\n"
+                for event in _batch_download_playlist(
+                    payload.url,
+                    payload.playlist_id,
+                    payload.concurrency
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    
         except FileNotFoundError:
             message = {"type": "error", "message": "yt-dlp is not installed"}
             yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
