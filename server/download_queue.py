@@ -81,8 +81,6 @@ class ThreadPoolDownloadQueue(DownloadQueue):
                 else:
                     url = entry.get("url", "")
             
-            print(f"[DEBUG] Processing entry {index+1}/{total}: {url}")
-            
             task = DownloadTask(
                 task_id=task_id,
                 url=url,
@@ -102,7 +100,6 @@ class ThreadPoolDownloadQueue(DownloadQueue):
                 
                 return result
             except Exception as exc:
-                print(f"[DEBUG] Error processing {url}: {exc}")
                 self._active_tasks[task_id]["failed"] += 1
                 if progress_callback:
                     progress_callback(task, {"error": str(exc)})

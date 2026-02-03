@@ -742,11 +742,9 @@ def _download_single_track_from_url(url: str, playlist_id: str | None = None) ->
 def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_size: int = 5):
     """プレイリストを分割して並列ダウンロード（ジェネレーター）"""
     # プレイリストのエントリを取得
-    print(f"[DEBUG] Fetching playlist entries from: {url}")
     entries = _fetch_flat_playlist_entries(url)
     
     if not entries:
-        print(f"[DEBUG] No entries found")
         yield {
             "type": "error",
             "message": "プレイリストが空です、または取得できませんでした",
@@ -754,16 +752,11 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
         return
     
     total = len(entries)
-    print(f"[DEBUG] Found {total} entries")
     yield {
         "type": "playlist_info",
         "total": total,
         "message": f"{total}件のエントリを検出しました",
     }
-    
-    # デバッグ: 最初のエントリを表示
-    if entries:
-        print(f"[DEBUG] First entry: {entries[0]}")
     
     # ダウンロードキューを作成
     queue = create_download_queue(max_workers=batch_size)
@@ -776,26 +769,21 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
         """進捗コールバック"""
         nonlocal completed, failed, downloaded_tracks
         
-        print(f"[DEBUG] Progress callback - Task: {task.url}, Result type: {type(result)}")
         if isinstance(result, dict) and "error" in result:
             failed += 1
-            print(f"[DEBUG] Failed: {result.get('error')}")
         else:
             completed += 1
             if isinstance(result, list):
                 downloaded_tracks.extend(result)
-                print(f"[DEBUG] Downloaded {len(result)} tracks")
     
     # プレイリストダウンロードを開始
     try:
-        print(f"[DEBUG] Enqueueing playlist with {len(entries)} entries")
         task_id = queue.enqueue_playlist(
             entries=entries,
             download_func=_download_single_track_from_url,
             playlist_id=playlist_id,
             progress_callback=progress_callback,
         )
-        print(f"[DEBUG] Task ID: {task_id}")
         
         # 進捗を監視
         while completed + failed < total:
