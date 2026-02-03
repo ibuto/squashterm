@@ -24,6 +24,9 @@ const importForm = document.getElementById("import-form");
 const importUrl = document.getElementById("import-url");
 const importAutoTag = document.getElementById("import-auto-tag");
 const importPlaylistSelect = document.getElementById("import-playlist-select");
+const importPlaylistMode = document.getElementById("import-playlist-mode");
+const importBatchSize = document.getElementById("import-batch-size");
+const batchSizeWrapper = document.getElementById("batch-size-wrapper");
 const importSubmit = document.getElementById("import-submit");
 const importLog = document.getElementById("import-log");
 const importProgressBar = document.getElementById("import-progress-bar");
@@ -1532,29 +1535,113 @@ const streamImport = async (payload) => {
   }
 };
 
+const streamPlaylistBatchImport = async (payload) => {
+  const response = await fetch("/api/library/import/playlist-batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "プレイリストダウンロードの開始に失敗しました。");
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    chunks.forEach((chunk) => {
+      const line = chunk
+        .split("\n")
+        .find((entry) => entry.startsWith("data: "));
+      if (!line) {
+        return;
+      }
+      const data = line.replace("data: ", "").trim();
+      if (!data) {
+        return;
+      }
+      try {
+        const event = JSON.parse(data);
+        if (event.type === "playlist_info") {
+          appendImportLog(`プレイリスト検出: ${event.total}件`, { append: true });
+        }
+        if (event.type === "progress") {
+          const percentage = event.percentage || 0;
+          updateImportProgress(percentage, `${event.completed}/${event.total} 完了 (失敗: ${event.failed})`);
+          appendImportLog(`進行中: ${event.completed}/${event.total}`, { append: true });
+        }
+        if (event.type === "error") {
+          updateImportProgress(0, "エラー");
+          appendImportLog(`エラー: ${event.message}`, { append: true });
+        }
+        if (event.type === "complete") {
+          updateImportProgress(100, "完了");
+          appendImportLog(`完了: ${event.completed}件成功, ${event.failed}件失敗`, { append: true });
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  }
+};
+
 const handleImportSubmit = async () => {
   const url = importUrl?.value?.trim();
   if (!url) {
     appendImportLog("URL を入力してください。");
     return;
   }
-  const payload = {
-    url,
-  };
-  payload.auto_tag = Boolean(importAutoTag?.checked);
-  const playlistId = importPlaylistSelect?.value?.trim();
-  if (playlistId) {
-    payload.playlist_id = playlistId;
-  }
-  appendImportLog("yt-dlp を実行中...", { reset: true });
-  updateImportProgress(0, "開始");
-  try {
-    await streamImport(payload);
-    await refreshLibrary();
-    importUrl.value = "";
-  } catch (error) {
-    appendImportLog(`エラー: ${error.message}`, { append: true });
-    updateImportProgress(0, "失敗");
+  
+  const playlistMode = importPlaylistMode?.checked || false;
+  const batchSize = parseInt(importBatchSize?.value || "5", 10);
+  
+  if (playlistMode) {
+    // プレイリスト一括ダウンロードモード
+    const payload = {
+      url,
+      batch_size: batchSize,
+    };
+    const playlistId = importPlaylistSelect?.value?.trim();
+    if (playlistId) {
+      payload.playlist_id = playlistId;
+    }
+    appendImportLog("プレイリスト一括ダウンロードを開始中...", { reset: true });
+    updateImportProgress(0, "開始");
+    try {
+      await streamPlaylistBatchImport(payload);
+      await refreshLibrary();
+      importUrl.value = "";
+    } catch (error) {
+      appendImportLog(`エラー: ${error.message}`, { append: true });
+      updateImportProgress(0, "失敗");
+    }
+  } else {
+    // 通常モード（単一動画）
+    const payload = {
+      url,
+    };
+    payload.auto_tag = Boolean(importAutoTag?.checked);
+    const playlistId = importPlaylistSelect?.value?.trim();
+    if (playlistId) {
+      payload.playlist_id = playlistId;
+    }
+    appendImportLog("yt-dlp を実行中...", { reset: true });
+    updateImportProgress(0, "開始");
+    try {
+      await streamImport(payload);
+      await refreshLibrary();
+      importUrl.value = "";
+    } catch (error) {
+      appendImportLog(`エラー: ${error.message}`, { append: true });
+      updateImportProgress(0, "失敗");
+    }
   }
 };
 
@@ -1743,6 +1830,16 @@ if (tagSelect) {
       (track) => String(track.id) === String(tagSelect.value)
     );
     setTagFields(selectedTrack);
+  });
+}
+
+if (importPlaylistMode && batchSizeWrapper) {
+  importPlaylistMode.addEventListener("change", (event) => {
+    if (event.target.checked) {
+      batchSizeWrapper.style.display = "block";
+    } else {
+      batchSizeWrapper.style.display = "none";
+    }
   });
 }
 
