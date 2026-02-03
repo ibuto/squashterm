@@ -592,7 +592,6 @@ def _build_system_payload() -> dict:
 def _download_with_ytdlp(url: str) -> tuple[list[dict], str]:
     command = [
         "yt-dlp",
-        "--no-playlist",
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
@@ -633,7 +632,6 @@ def _build_ytdlp_command(url: str) -> list[str]:
         "yt-dlp",
         "--newline",
         "--progress",
-        "--no-playlist",
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
