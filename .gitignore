@@ -1,3 +1,4 @@
 server/data/*
 .DS_Store
 venv/
+/server/__pycache__
