@@ -709,7 +709,7 @@ def _iter_ytdlp_events(url: str, playlist_id: str | None = None, no_playlist: bo
     }
 
 def _store_downloaded_tracks(
-    infos: list[dict], source_url: str | None = None, playlist_id: str | None = None
+    infos: list[dict], source_url: str | None = None, playlist_id: str | None = None, save_immediately: bool = True
 ) -> list[Track]:
     stored_tracks: list[Track] = []
     data = _load_library()
@@ -733,7 +733,8 @@ def _store_downloaded_tracks(
             if track.source_url and not track_entry.get("source_url"):
                 track_entry["source_url"] = track.source_url
         stored_tracks.append(track)
-    _save_library(data)
+    if save_immediately:
+        _save_library(data)
     _append_tracks_to_playlist(playlist_id, [track.id for track in stored_tracks])
     return stored_tracks
 
@@ -747,7 +748,7 @@ def _ingest_from_url(
 def _download_single_track_from_url(url: str, playlist_id: str | None = None) -> list[Track]:
     """単一トラックのダウンロード（プレイリスト分割ダウンロード用）"""
     infos, _ = _download_with_ytdlp(url)
-    tracks = _store_downloaded_tracks(infos, url, playlist_id)
+    tracks = _store_downloaded_tracks(infos, url, playlist_id, save_immediately=False)
     return tracks
 
 def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_size: int = 5):
@@ -816,6 +817,10 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
                 "percentage": int((completed + failed) / total * 100),
             }
             time.sleep(0.5)
+        
+        # 全ダウンロード完了後に一度だけ保存
+        data = _load_library()
+        _save_library(data)
         
         # 完了
         yield {
