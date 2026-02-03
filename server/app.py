@@ -13,6 +13,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse, urlunparse
 
 # --- 新しいライブラリのインポート ---
@@ -21,6 +22,9 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
+
+# --- ダウンロードキューモジュール ---
+from download_queue import create_download_queue, DownloadTask
 
 # --- ディレクトリ設定 ---
 BASE_DIR = Path(__file__).resolve().parent
@@ -81,6 +85,11 @@ class ImportRequest(BaseModel):
     url: str
     playlist_id: str | None = None
     auto_tag: bool | None = None
+
+class PlaylistBatchImportRequest(BaseModel):
+    url: str
+    playlist_id: str | None = None
+    batch_size: int = 5
 
 class PlaylistCreate(BaseModel):
     name: str
@@ -726,6 +735,85 @@ def _ingest_from_url(
     tracks = _store_downloaded_tracks(infos, url, playlist_id)
     return tracks, log_output
 
+def _download_single_track_from_url(url: str, playlist_id: str | None = None) -> list[Track]:
+    """単一トラックのダウンロード（プレイリスト分割ダウンロード用）"""
+    infos, _ = _download_with_ytdlp(url)
+    tracks = _store_downloaded_tracks(infos, url, playlist_id)
+    return tracks
+
+def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_size: int = 5):
+    """プレイリストを分割して並列ダウンロード（ジェネレーター）"""
+    # プレイリストのエントリを取得
+    entries = _fetch_flat_playlist_entries(url)
+    
+    if not entries:
+        yield {
+            "type": "error",
+            "message": "プレイリストが空です、または取得できませんでした",
+        }
+        return
+    
+    total = len(entries)
+    yield {
+        "type": "playlist_info",
+        "total": total,
+        "message": f"{total}件のエントリを検出しました",
+    }
+    
+    # ダウンロードキューを作成
+    queue = create_download_queue(max_workers=batch_size)
+    
+    downloaded_tracks = []
+    completed = 0
+    failed = 0
+    
+    def progress_callback(task: DownloadTask, result: Any):
+        """進捗コールバック"""
+        nonlocal completed, failed, downloaded_tracks
+        
+        if isinstance(result, dict) and "error" in result:
+            failed += 1
+        else:
+            completed += 1
+            if isinstance(result, list):
+                downloaded_tracks.extend(result)
+    
+    # プレイリストダウンロードを開始
+    try:
+        task_id = queue.enqueue_playlist(
+            entries=entries,
+            download_func=_download_single_track_from_url,
+            playlist_id=playlist_id,
+            progress_callback=progress_callback,
+        )
+        
+        # 進捗を監視
+        while completed + failed < total:
+            yield {
+                "type": "progress",
+                "completed": completed,
+                "failed": failed,
+                "total": total,
+                "percentage": int((completed + failed) / total * 100),
+            }
+            time.sleep(0.5)
+        
+        # 完了
+        yield {
+            "type": "complete",
+            "completed": completed,
+            "failed": failed,
+            "total": total,
+            "tracks": [asdict(track) for track in downloaded_tracks],
+        }
+        
+    except Exception as exc:
+        yield {
+            "type": "error",
+            "message": str(exc),
+        }
+
+
 # --- FastAPI アプリケーション定義 ---
 
 app = FastAPI(title="SquashTerm Server", version="0.1.0")
@@ -950,6 +1038,26 @@ def import_track_stream(payload: ImportRequest):
             message = {"type": "error", "message": str(exc)}
             yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
 
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.post("/api/library/import/playlist-batch")
+def import_playlist_batch(payload: PlaylistBatchImportRequest):
+    """プレイリストを分割して並列ダウンロード（SSE）"""
+    def event_generator():
+        try:
+            for event in _batch_download_playlist(
+                payload.url,
+                payload.playlist_id,
+                payload.batch_size
+            ):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except FileNotFoundError:
+            message = {"type": "error", "message": "yt-dlp is not installed"}
+            yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            message = {"type": "error", "message": str(exc)}
+            yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+    
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.post("/api/library/upload")
