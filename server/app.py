@@ -494,6 +494,22 @@ def _load_settings() -> dict:
 def _save_library(data: dict) -> None:
     LIBRARY_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
+def _remove_media_asset(path_value: str | None) -> None:
+    if not path_value:
+        return
+    if path_value.startswith("/media/"):
+        path = MEDIA_DIR / Path(path_value).name
+    else:
+        path = Path(path_value)
+    try:
+        resolved = path.resolve()
+    except FileNotFoundError:
+        return
+    if MEDIA_DIR not in resolved.parents and resolved != MEDIA_DIR:
+        return
+    if resolved.exists():
+        resolved.unlink()
+
 def _fetch_tracks() -> list[Track]:
     data = _load_library()
     rows = data.get("tracks", [])
@@ -771,6 +787,25 @@ def update_track(track_id: str, payload: TrackUpdate):
         source_url=track.get("source_url"),
     )
     return asdict(updated)
+
+@app.delete("/api/library/{track_id}", status_code=204)
+def delete_track(track_id: str):
+    data = _load_library()
+    tracks = data.get("tracks", [])
+    target_index = next(
+        (index for index, item in enumerate(tracks) if item.get("id") == track_id),
+        None,
+    )
+    if target_index is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    removed = tracks.pop(target_index)
+    data["favorites"] = [item for item in data.get("favorites", []) if item != track_id]
+    for playlist in data.get("playlists", []):
+        playlist["track_ids"] = [item for item in playlist.get("track_ids", []) if item != track_id]
+    _save_library(data)
+    _remove_media_asset(removed.get("file_path"))
+    _remove_media_asset(removed.get("cover"))
+    return Response(status_code=204)
 
 @app.get("/api/playlists")
 def get_playlists():
