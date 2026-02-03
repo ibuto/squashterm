@@ -74,6 +74,7 @@ const playerDownload = document.getElementById("player-download");
 const playerAddPlaylist = document.getElementById("player-add-playlist");
 const playerOpenSource = document.getElementById("player-open-source");
 const playerEditInfo = document.getElementById("player-edit-info");
+const playerDeleteTrack = document.getElementById("player-delete-track");
 const playerSeek = document.getElementById("player-seek");
 const playerCurrent = document.getElementById("player-current");
 const playerDuration = document.getElementById("player-duration");
@@ -1109,6 +1110,9 @@ const updatePlayerMenuButtons = () => {
   if (playerAddPlaylist) {
     playerAddPlaylist.disabled = !track;
   }
+  if (playerDeleteTrack) {
+    playerDeleteTrack.disabled = !track;
+  }
 };
 
 const reorderTrackIds = (trackIds, draggedId, targetId) => {
@@ -1145,6 +1149,10 @@ const updateFavoritesTracks = async (trackIds) => {
 
 const updateTrackMetadata = async (trackId, payload) => {
   return requestJson(`/api/library/${trackId}`, payload, "PUT");
+};
+
+const deleteTrack = async (trackId) => {
+  return requestJson(`/api/library/${trackId}`, null, "DELETE");
 };
 
 const addTrackToPlaylist = async (playlistId) => {
@@ -2081,8 +2089,8 @@ if (playerMenuToggle) {
 
 if (playerMenuPanel) {
   playerMenuPanel.addEventListener("click", (event) => {
-    const target = event.target;
-    if (target && target.matches("button")) {
+    const targetButton = event.target?.closest("button");
+    if (targetButton) {
       closePlayerMenu();
     }
   });
@@ -2114,6 +2122,29 @@ if (playerEditInfo) {
     }
     closePlayerMenu();
     openTrackEditModal(track);
+  });
+}
+
+if (playerDeleteTrack) {
+  playerDeleteTrack.addEventListener("click", async () => {
+    const track = state.tracks[playerState.currentIndex];
+    if (!track) {
+      return;
+    }
+    closePlayerMenu();
+    const confirmed = window.confirm(`「${track.title}」を削除しますか？`);
+    if (!confirmed) {
+      return;
+    }
+    try {
+      stopPlayback();
+      closePlayerOverlay();
+      await deleteTrack(track.id);
+      await refreshLibrary();
+    } catch (error) {
+      console.error(error);
+      appendImportLog("曲の削除に失敗しました。", { append: true });
+    }
   });
 }
 
