@@ -745,11 +745,10 @@ def _ingest_from_url(
     tracks = _store_downloaded_tracks(infos, url, playlist_id)
     return tracks, log_output
 
-def _download_single_track_from_url(url: str, playlist_id: str | None = None) -> list[Track]:
-    """単一トラックのダウンロード（プレイリスト分割ダウンロード用）"""
+def _download_single_track_from_url(url: str, playlist_id: str | None = None) -> tuple[list[dict], str]:
+    """単一トラックのダウンロード（プレイリスト分割ダウンロード用）- メタデータのみ返す"""
     infos, _ = _download_with_ytdlp(url)
-    tracks = _store_downloaded_tracks(infos, url, playlist_id, save_immediately=False)
-    return tracks
+    return infos, url
 
 def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_size: int = 5):
     """プレイリストを分割して並列ダウンロード（ジェネレーター）"""
@@ -783,20 +782,22 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
     # ダウンロードキューを作成
     queue = create_download_queue(max_workers=batch_size)
     
-    downloaded_tracks = []
+    downloaded_infos = []
     completed = 0
     failed = 0
     
     def progress_callback(task: DownloadTask, result: Any):
         """進捗コールバック"""
-        nonlocal completed, failed, downloaded_tracks
+        nonlocal completed, failed, downloaded_infos
         
         if isinstance(result, dict) and "error" in result:
             failed += 1
         else:
             completed += 1
-            if isinstance(result, list):
-                downloaded_tracks.extend(result)
+            if isinstance(result, tuple) and len(result) == 2:
+                infos, source_url = result
+                for info in infos:
+                    downloaded_infos.append((info, source_url))
     
     # プレイリストダウンロードを開始
     try:
@@ -818,9 +819,39 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
             }
             time.sleep(0.5)
         
-        # 全ダウンロード完了後に一度だけ保存
-        data = _load_library()
-        _save_library(data)
+        # 全ダウンロード完了後に一括保存
+        all_infos = [info for info, _ in downloaded_infos]
+        source_urls = {info.get("id"): url for info, url in downloaded_infos}
+        
+        # 一度だけlibrary.jsonを読み込んで全トラックを保存
+        stored_tracks = []
+        if all_infos:
+            data = _load_library()
+            tracks_data = data.setdefault("tracks", [])
+            track_map = {track["id"]: track for track in tracks_data}
+            
+            for info in all_infos:
+                track = _parse_track_from_info(info, source_urls.get(info.get("id")))
+                resolved_cover = _resolve_thumbnail_path(info)
+                if resolved_cover:
+                    track.cover = resolved_cover
+                file_path = MEDIA_DIR / f"{info.get('id', track.id)}.mp3"
+                track.file_url = f"/media/{file_path.name}"
+                
+                if track.id not in track_map:
+                    track_entry = {**asdict(track), "file_path": str(file_path)}
+                    tracks_data.append(track_entry)
+                    track_map[track.id] = track_entry
+                else:
+                    track_entry = track_map[track.id]
+                    if resolved_cover and track_entry.get("cover") in ("", DEFAULT_COVER):
+                        track_entry["cover"] = resolved_cover
+                    if track.source_url and not track_entry.get("source_url"):
+                        track_entry["source_url"] = track.source_url
+                stored_tracks.append(track)
+            
+            _save_library(data)
+            _append_tracks_to_playlist(playlist_id, [track.id for track in stored_tracks])
         
         # 完了
         yield {
@@ -828,7 +859,7 @@ def _batch_download_playlist(url: str, playlist_id: str | None = None, batch_siz
             "completed": completed,
             "failed": failed,
             "total": total,
-            "tracks": [asdict(track) for track in downloaded_tracks],
+            "tracks": [asdict(track) for track in stored_tracks],
         }
         
     except Exception as exc:
