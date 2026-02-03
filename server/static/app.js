@@ -24,9 +24,7 @@ const importForm = document.getElementById("import-form");
 const importUrl = document.getElementById("import-url");
 const importAutoTag = document.getElementById("import-auto-tag");
 const importPlaylistSelect = document.getElementById("import-playlist-select");
-const importPlaylistMode = document.getElementById("import-playlist-mode");
-const importBatchSize = document.getElementById("import-batch-size");
-const batchSizeWrapper = document.getElementById("batch-size-wrapper");
+const playlistConcurrencyInput = document.getElementById("playlist-concurrency");
 const importSubmit = document.getElementById("import-submit");
 const importLog = document.getElementById("import-log");
 const importProgressBar = document.getElementById("import-progress-bar");
@@ -1607,49 +1605,28 @@ const handleImportSubmit = async () => {
     return;
   }
   
-  const playlistMode = importPlaylistMode?.checked || false;
-  const batchSize = parseInt(importBatchSize?.value || "5", 10);
+  // 並列度設定を取得（デフォルト10）
+  const concurrency = parseInt(localStorage.getItem("playlistConcurrency") || "10", 10);
   
-  if (playlistMode) {
-    // プレイリスト一括ダウンロードモード
-    const payload = {
-      url,
-      batch_size: batchSize,
-    };
-    const playlistId = importPlaylistSelect?.value?.trim();
-    if (playlistId) {
-      payload.playlist_id = playlistId;
-    }
-    appendImportLog("プレイリスト一括ダウンロードを開始中...", { reset: true });
-    updateImportProgress(0, "開始");
-    try {
-      await streamPlaylistBatchImport(payload);
-      await refreshLibrary();
-      importUrl.value = "";
-    } catch (error) {
-      appendImportLog(`エラー: ${error.message}`, { append: true });
-      updateImportProgress(0, "失敗");
-    }
-  } else {
-    // 通常モード（単一動画）
-    const payload = {
-      url,
-    };
-    payload.auto_tag = Boolean(importAutoTag?.checked);
-    const playlistId = importPlaylistSelect?.value?.trim();
-    if (playlistId) {
-      payload.playlist_id = playlistId;
-    }
-    appendImportLog("yt-dlp を実行中...", { reset: true });
-    updateImportProgress(0, "開始");
-    try {
-      await streamImport(payload);
-      await refreshLibrary();
-      importUrl.value = "";
-    } catch (error) {
-      appendImportLog(`エラー: ${error.message}`, { append: true });
-      updateImportProgress(0, "失敗");
-    }
+  // 自動判定モード：プレイリストかどうかをバックエンドで判定
+  const payload = {
+    url,
+    concurrency,
+  };
+  payload.auto_tag = Boolean(importAutoTag?.checked);
+  const playlistId = importPlaylistSelect?.value?.trim();
+  if (playlistId) {
+    payload.playlist_id = playlistId;
+  }
+  appendImportLog("ダウンロードを開始中...", { reset: true });
+  updateImportProgress(0, "開始");
+  try {
+    await streamPlaylistBatchImport(payload);
+    await refreshLibrary();
+    importUrl.value = "";
+  } catch (error) {
+    appendImportLog(`エラー: ${error.message}`, { append: true });
+    updateImportProgress(0, "失敗");
   }
 };
 
@@ -1841,12 +1818,19 @@ if (tagSelect) {
   });
 }
 
-if (importPlaylistMode && batchSizeWrapper) {
-  importPlaylistMode.addEventListener("change", (event) => {
-    if (event.target.checked) {
-      batchSizeWrapper.style.display = "block";
-    } else {
-      batchSizeWrapper.style.display = "none";
+// 並列度設定の読み込み・保存
+if (playlistConcurrencyInput) {
+  // 初期値をlocalStorageから読み込み
+  const savedConcurrency = localStorage.getItem("playlistConcurrency");
+  if (savedConcurrency) {
+    playlistConcurrencyInput.value = savedConcurrency;
+  }
+  
+  // 値変更時にlocalStorageへ保存
+  playlistConcurrencyInput.addEventListener("change", (event) => {
+    const value = parseInt(event.target.value, 10);
+    if (value >= 1 && value <= 20) {
+      localStorage.setItem("playlistConcurrency", value.toString());
     }
   });
 }

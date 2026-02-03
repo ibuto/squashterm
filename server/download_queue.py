@@ -91,9 +91,7 @@ class ThreadPoolDownloadQueue(DownloadQueue):
             )
             
             try:
-                print(f"[DEBUG] Downloading: {url}")
                 result = download_func(url, playlist_id)
-                print(f"[DEBUG] Downloaded successfully: {url}")
                 self._active_tasks[task_id]["completed"] += 1
                 self._active_tasks[task_id]["results"].append(result)
                 
@@ -102,20 +100,16 @@ class ThreadPoolDownloadQueue(DownloadQueue):
                 
                 return result
             except Exception as exc:
-                print(f"[DEBUG] Error downloading {url}: {exc}")
                 self._active_tasks[task_id]["failed"] += 1
                 if progress_callback:
                     progress_callback(task, {"error": str(exc)})
                 return {"error": str(exc)}
         
         # 各エントリを非同期にサブミット
-        print(f"[DEBUG] Submitting {len(entries)} tasks to ThreadPoolExecutor")
         for idx, entry in enumerate(entries):
             future = self._executor.submit(process_entry, entry, idx)
             self._active_tasks[task_id]["futures"].append(future)
-            print(f"[DEBUG] Submitted task {idx+1}/{len(entries)}")
         
-        print(f"[DEBUG] All tasks submitted. Task ID: {task_id}")
         return task_id
     
     def get_status(self, task_id: str) -> dict:
