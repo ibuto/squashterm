@@ -3,5 +3,3 @@ mutagen
 python-multipart
 uvicorn[standard]
 yt-dlp
-redis
-certifi
