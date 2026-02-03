@@ -2,23 +2,44 @@
 
 yt-dlpで楽曲を取得できる音楽アプリケーションです。
 
-## 主な画面
+## 主な機能
 
-- **メディア**: ID3 タグを基にアルバムカバー、アーティスト、タイトルを一覧表示。
-- **プレイリスト / お気に入り**: プレイリストの作成・お気に入りの再生を想定した UI。
-- **楽曲管理**: yt-dlp を使った楽曲追加、ID3 タグ編集のフォーム。
-- **設定**: バージョン情報、ストレージ、再生設定の概要。
-
+  - モバイルフレンドリーなWebGUI
+  - 簡単に操作できる画面構成
+  - 楽曲登録・管理を容易にするyt-dlp連携
+  - 軽量
+  - 複雑な手順を踏まずデプロイ可能
 ## セットアップ
 
+初回実行・アップデート時はライブラリの確認をお勧めします。
+
+### リポジトリのクローン
+```
+git clone https://github.com/ibuto/squashterm
+cd squashterm
+```
+
+### venvの作成
 ```bash
+python -m venv venv
+```
+
+### venv環境へ入る
+Windows:
+```
+venv\Scripts\activate
+```
+macOS:
+```
+source venv/bin/activate
+```
+
+### ライブラリの導入・起動
+```
+pip install -r requirements.txt
 python server/app.py
 ```
 
+## 使用
+
 ブラウザで `http://localhost:8000` を開きます。
-
-## 補足
-
-- yt-dlp を使った楽曲取り込みは `POST /api/library/import` で実行します。
-  - 送信例: `{ "url": "...", "playlist_id": "pl_001", "playlist_name": "未分類" }`
-- サーバー初回起動時に `data/library.json` を作成し、デモ用のデータを初期登録します。
