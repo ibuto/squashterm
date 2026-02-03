@@ -151,6 +151,14 @@
                     <option value="">指定なし</option>
                   </select>
                 </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="import-playlist-mode" />
+                  <span>プレイリスト一括ダウンロード（分割並列実行）</span>
+                </label>
+                <label id="batch-size-wrapper" class="batch-size-input" style="display: none;">
+                  <span>並列ダウンロード数</span>
+                  <input type="number" id="import-batch-size" min="1" max="10" value="5" />
+                </label>
                 <button type="button" class="primary" id="import-submit">ライブラリに追加</button>
                 <div class="import-progress">
                   <div class="progress">
