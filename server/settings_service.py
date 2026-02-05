@@ -174,12 +174,21 @@ def get_dynamic_version(repo_root: Path) -> dict:
             "build": build_date or "unknown"
         }
     
-    # Fallback: 上流のバージョンロジック
-    version_data = load_version_data()
-    git_hash = resolve_git_hash(repo_root)
-    import fastapi
-    return {
-        "app": f"{version_data.get('version', '0.1.0')}@{git_hash}",
-        "api": f"FastAPI {fastapi.__version__}",
-        "build": resolve_build_time()
-    }
+    # Fallback: 上流のバージョンロジック（Python直接起動時）
+    try:
+        version_data = load_version_data()
+        git_hash = resolve_git_hash(repo_root)
+        import fastapi
+        return {
+            "app": f"{version_data.get('version', '0.1.0')}@{git_hash}",
+            "api": f"FastAPI {fastapi.__version__}",
+            "build": resolve_build_time()
+        }
+    except Exception:
+        # Git情報取得失敗時のフォールバック
+        import fastapi
+        return {
+            "app": "unknown@unknown",
+            "api": f"FastAPI {fastapi.__version__}",
+            "build": "unknown"
+        }
