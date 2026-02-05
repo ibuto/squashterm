@@ -97,6 +97,8 @@ const miniExpand = document.getElementById("mini-expand");
 const miniSeek = document.getElementById("mini-seek");
 const miniCurrent = document.getElementById("mini-current");
 const miniDuration = document.getElementById("mini-duration");
+const miniVolumeToggle = document.getElementById("mini-volume-toggle");
+const miniVolumeSlider = document.getElementById("mini-volume-slider");
 
 const playlistModal = document.getElementById("playlist-modal");
 const playlistModalList = document.getElementById("playlist-modal-list");
@@ -2063,6 +2065,10 @@ if (audioPlayer) {
       audioPlayer.play();
       return;
     }
+    if (playerState.shuffleMode) {
+      playNext();
+      return;
+    }
     if (playerState.loopMode === "playlist") {
       playNext();
       return;
@@ -2116,6 +2122,43 @@ if (playerVolumeToggle && audioPlayer) {
       const volume = previousVolume > 0 ? previousVolume : 1;
       audioPlayer.volume = volume;
       if (playerVolumeSlider) playerVolumeSlider.value = volume * 100;
+      localStorage.setItem("playerVolume", volume);
+    }
+  });
+}
+
+if (miniVolumeSlider && audioPlayer) {
+  miniVolumeSlider.addEventListener("input", (e) => {
+    const volume = e.target.value / 100;
+    audioPlayer.volume = volume;
+    localStorage.setItem("playerVolume", volume);
+  });
+  
+  audioPlayer.addEventListener("volumechange", () => {
+    if (miniVolumeSlider) {
+      miniVolumeSlider.value = audioPlayer.volume * 100;
+    }
+  });
+  
+  const savedVolume = localStorage.getItem("playerVolume");
+  if (savedVolume !== null) {
+    const volume = parseFloat(savedVolume);
+    miniVolumeSlider.value = volume * 100;
+  }
+}
+
+if (miniVolumeToggle && audioPlayer) {
+  let miniPreviousVolume = 1;
+  
+  miniVolumeToggle.addEventListener("click", () => {
+    if (audioPlayer.volume > 0) {
+      miniPreviousVolume = audioPlayer.volume;
+      audioPlayer.volume = 0;
+      if (miniVolumeSlider) miniVolumeSlider.value = 0;
+    } else {
+      const volume = miniPreviousVolume > 0 ? miniPreviousVolume : 1;
+      audioPlayer.volume = volume;
+      if (miniVolumeSlider) miniVolumeSlider.value = volume * 100;
       localStorage.setItem("playerVolume", volume);
     }
   });
