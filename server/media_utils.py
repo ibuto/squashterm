@@ -116,3 +116,52 @@ def save_cover_from_id3(file_path: Path, track_id: str) -> str | None:
         cover_path.write_bytes(apic.data)
         return f"/media/{cover_path.name}"
     return None
+
+
+def scan_media_directory() -> int:
+    """メディアディレクトリをスキャンして未登録ファイルをlibrary.jsonに追加"""
+    from library_service import load_library, save_library
+    from paths import DEFAULT_COVER
+    
+    data = load_library()
+    tracks = data.setdefault("tracks", [])
+    track_map = {track["id"]: track for track in tracks}
+    
+    added_count = 0
+    for mp3_file in MEDIA_DIR.glob("*.mp3"):
+        file_id = f"yt_{mp3_file.stem}"
+        
+        if file_id in track_map:
+            continue
+        
+        # カバー画像を探す
+        cover_path = None
+        for ext in [".jpg", ".jpeg", ".png", ".webp"]:
+            potential_cover = MEDIA_DIR / f"{mp3_file.stem}{ext}"
+            if potential_cover.exists():
+                cover_path = f"/media/{potential_cover.name}"
+                break
+        
+        track_entry = {
+            "id": file_id,
+            "title": mp3_file.stem,
+            "artist": "Unknown Artist",
+            "album": "Unknown Album",
+            "cover": cover_path or DEFAULT_COVER,
+            "duration": "0:00",
+            "bpm": 0,
+            "genre": "Unknown",
+            "year": 0,
+            "file_url": f"/media/{mp3_file.name}",
+            "source_url": "",
+            "file_path": str(mp3_file),
+        }
+        tracks.append(track_entry)
+        track_map[file_id] = track_entry
+        added_count += 1
+    
+    if added_count > 0:
+        save_library(data)
+        print(f"自動スキャン: {added_count}件の新しいメディアファイルをライブラリに追加しました")
+    
+    return added_count

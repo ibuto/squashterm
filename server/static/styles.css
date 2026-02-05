@@ -12,11 +12,13 @@
 body {
   margin: 0;
   background: #1d1d1d;
+  overflow-x: hidden;
 }
 
 .app {
   min-height: 100vh;
   padding: 24px;
+  overflow-x: hidden;
 }
 
 .layout {
@@ -629,6 +631,18 @@ body {
   gap: 20px;
 }
 
+.manage-grid .card {
+  gap: 8px;
+}
+
+.manage-grid .card h4 {
+  margin-bottom: -2px;
+}
+
+.manage-grid .card label {
+  gap: 4px;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -693,7 +707,8 @@ body {
 }
 
 label {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   font-size: 14px;
   color: #e2e8f0;
@@ -701,16 +716,49 @@ label {
 
 input,
 select {
+  width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid #334155;
   font-size: 14px;
   background: #1d1d1d;
   color: #e2e8f0;
+  box-sizing: border-box;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+input[type="number"] {
+  max-width: 150px;
+}
+
+input[type="file"] {
+  padding: 8px 12px;
+}
+
+.batch-size-input {
+  display: grid;
+  gap: 6px;
+}
+
+.batch-size-input input[type="number"] {
+  width: 120px;
+  max-width: 120px;
+}
+
+.form-grid input[type="number"] {
+  max-width: none;
+  width: 100%;
 }
 
 .checkbox {
   display: flex;
+  flex-direction: row;
   gap: 8px;
   align-items: center;
   font-size: 14px;
@@ -1281,7 +1329,7 @@ select {
     justify-content: center;
     padding: 10px 16px;
     border-radius: 999px;
-    z-index: 10;
+    z-index: 100;
     height: auto;
   }
 
@@ -1300,22 +1348,36 @@ select {
   }
   .nav-menu {
     flex-direction: row;
-    gap: 12px;
+    gap: 8px;
   }
 
   .nav-button {
     flex-direction: column;
-    padding: 8px 10px;
-    border-radius: 12px;
-    font-size: 11px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    gap: 3px;
   }
 
   .nav-button .label {
-    font-size: 10px;
+    font-size: 9px;
+  }
+  
+  .nav-button .nav-icon {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .nav-button .icon {
+    font-size: 14px;
   }
 
   .content {
     padding-bottom: 220px;
+  }
+  
+  .media-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 
   .playlist-layout {
@@ -1331,13 +1393,14 @@ select {
   .mini-player {
     left: 16px;
     right: 16px;
-    bottom: 96px;
+    bottom: 100px;
     grid-template-columns: 1fr;
     grid-template-areas:
       "info"
       "controls"
       "progress";
     align-items: flex-start;
+    z-index: 50;
   }
 
   .mini-controls {

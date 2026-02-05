@@ -59,3 +59,9 @@ class TrackUpdate(BaseModel):
     artist: str | None = None
     album: str | None = None
     source_url: str | None = None
+
+
+class PlaybackOptionUpdate(BaseModel):
+    """再生設定の更新"""
+    option_id: str
+    enabled: bool
