@@ -2083,6 +2083,44 @@ if (playerSeek && audioPlayer) {
   });
 }
 
+if (playerVolumeSlider && audioPlayer) {
+  playerVolumeSlider.addEventListener("input", (e) => {
+    const volume = e.target.value / 100;
+    audioPlayer.volume = volume;
+    localStorage.setItem("playerVolume", volume);
+  });
+  
+  audioPlayer.addEventListener("volumechange", () => {
+    if (playerVolumeSlider) {
+      playerVolumeSlider.value = audioPlayer.volume * 100;
+    }
+  });
+  
+  const savedVolume = localStorage.getItem("playerVolume");
+  if (savedVolume !== null) {
+    const volume = parseFloat(savedVolume);
+    playerVolumeSlider.value = volume * 100;
+    audioPlayer.volume = volume;
+  }
+}
+
+if (playerVolumeToggle && audioPlayer) {
+  let previousVolume = 1;
+  
+  playerVolumeToggle.addEventListener("click", () => {
+    if (audioPlayer.volume > 0) {
+      previousVolume = audioPlayer.volume;
+      audioPlayer.volume = 0;
+      if (playerVolumeSlider) playerVolumeSlider.value = 0;
+    } else {
+      const volume = previousVolume > 0 ? previousVolume : 1;
+      audioPlayer.volume = volume;
+      if (playerVolumeSlider) playerVolumeSlider.value = volume * 100;
+      localStorage.setItem("playerVolume", volume);
+    }
+  });
+}
+
 if (miniSeek && audioPlayer) {
   miniSeek.addEventListener("input", (event) => {
     const value = Number(event.target.value);
