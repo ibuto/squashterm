@@ -26,6 +26,13 @@ class ImportRequest(BaseModel):
     auto_tag: bool | None = None
 
 
+class PlaylistBatchImportRequest(BaseModel):
+    url: str
+    playlist_id: str | None = None
+    concurrency: int = 10
+    auto_tag: bool | None = None
+
+
 class PlaylistCreate(BaseModel):
     name: str
     track_ids: list[str] = []
@@ -51,3 +58,8 @@ class TrackUpdate(BaseModel):
     artist: str | None = None
     album: str | None = None
     source_url: str | None = None
+
+
+class PlaybackOptionUpdate(BaseModel):
+    option_id: str
+    enabled: bool

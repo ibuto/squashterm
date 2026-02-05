@@ -100,17 +100,12 @@ def load_settings(default_settings: dict) -> dict:
 
 def build_settings_payload(repo_root: Path) -> dict:
     settings = load_settings(DEFAULT_SETTINGS)
-    app_settings = settings.get("app", {})
     storage = settings.get("storage", {})
     used_gb = storage.get("used_gb", 0)
     total_gb = storage.get("total_gb", 0)
     percent = int((used_gb / total_gb) * 100) if total_gb else 0
     return {
-        "version": {
-            "app": build_version_label(repo_root),
-            "api": app_settings.get("api", ""),
-            "build": resolve_build_time(),
-        },
+        "version": get_dynamic_version(repo_root),
         "storage": {
             "used_gb": used_gb,
             "total_gb": total_gb,
@@ -135,4 +130,56 @@ def build_system_payload() -> dict:
         },
         "os": platform.platform(),
         "hostname": platform.node(),
+    }
+
+
+def update_playback_option(option_id: str, enabled: bool) -> dict:
+    """playback_optionsの設定を更新"""
+    settings = load_settings(DEFAULT_SETTINGS)
+    playback_options = settings.get("playback_options", [])
+    
+    updated = False
+    for option in playback_options:
+        if option.get("id") == option_id:
+            option["enabled"] = enabled
+            updated = True
+            break
+    
+    if not updated:
+        raise ValueError(f"Option not found: {option_id}")
+    
+    settings["playback_options"] = playback_options
+    SETTINGS_PATH.write_text(
+        json.dumps(settings, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    
+    return {"success": True, "option_id": option_id, "enabled": enabled}
+
+
+def get_dynamic_version(repo_root: Path) -> dict:
+    """環境変数ベースの動的バージョン情報（優先）、fallbackでversion.json"""
+    import os
+    
+    # 環境変数優先（Docker環境）
+    git_commit = os.getenv("GIT_COMMIT")
+    git_branch = os.getenv("GIT_BRANCH")
+    build_date = os.getenv("BUILD_DATE")
+    
+    if git_commit and git_branch:
+        import fastapi
+        return {
+            "app": f"{git_branch}@{git_commit}",
+            "api": f"FastAPI {fastapi.__version__}",
+            "build": build_date or "unknown"
+        }
+    
+    # Fallback: 上流のバージョンロジック
+    version_data = load_version_data()
+    git_hash = resolve_git_hash(repo_root)
+    import fastapi
+    return {
+        "app": f"{version_data.get('version', '0.1.0')}@{git_hash}",
+        "api": f"FastAPI {fastapi.__version__}",
+        "build": resolve_build_time()
     }
