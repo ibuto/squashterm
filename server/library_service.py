@@ -177,8 +177,27 @@ def fetch_tracks() -> list[Track]:
     data = load_library()
     rows = data.get("tracks", [])
     tracks = []
+    library_updated = False
     for row in rows:
         file_path = row.get("file_path")
+        file_format = row.get("file_format")
+        bitrate_kbps = row.get("bitrate_kbps")
+        if file_path and (not file_format or not bitrate_kbps):
+            path_obj = Path(file_path)
+            if path_obj.exists():
+                parsed = extract_id3_metadata(path_obj, format_duration)
+                if not file_format:
+                    file_format = (
+                        parsed.get("file_format")
+                        or path_obj.suffix.lstrip(".").lower()
+                        or None
+                    )
+                    row["file_format"] = file_format
+                    library_updated = True
+                if not bitrate_kbps and parsed.get("bitrate_kbps"):
+                    bitrate_kbps = parsed.get("bitrate_kbps")
+                    row["bitrate_kbps"] = bitrate_kbps
+                    library_updated = True
         file_url = f"/media/{Path(file_path).name}" if file_path else None
         tracks.append(
             Track(
@@ -193,10 +212,12 @@ def fetch_tracks() -> list[Track]:
                 year=row["year"],
                 file_url=file_url,
                 source_url=row.get("source_url"),
-                file_format=row.get("file_format"),
-                bitrate_kbps=row.get("bitrate_kbps"),
+                file_format=file_format,
+                bitrate_kbps=bitrate_kbps,
             )
         )
+    if library_updated:
+        save_library(data)
     return tracks
 
 
