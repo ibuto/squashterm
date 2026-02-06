@@ -1406,6 +1406,16 @@ input[type="file"] {
   .mini-controls {
     justify-content: flex-start;
   }
+
+  .player-overlay-open .sidebar {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .player-overlay-open .mini-player {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 @media (max-width: 600px) {
