@@ -16,6 +16,7 @@ import uvicorn
 from library_service import (
     append_track_record,
     append_tracks_to_playlist,
+    batch_download_playlist,
     build_upload_track,
     ensure_data_dirs,
     fetch_favorites,
@@ -30,6 +31,7 @@ from library_service import (
 from models import (
     FavoritesUpdate,
     ImportRequest,
+    PlaylistBatchImportRequest,
     PlaylistCreate,
     PlaylistUpdate,
     TrackUpdate,
@@ -44,7 +46,7 @@ from settings_service import (
     load_settings,
 )
 from sync_service import auto_sync_worker, sync_playlist_with_remote
-from ytdlp_service import ingest_from_url, iter_ytdlp_events
+from ytdlp_service import ingest_from_url, iter_ytdlp_events, is_single_video_url
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -262,8 +264,35 @@ def import_track(payload: ImportRequest):
 def import_track_stream(payload: ImportRequest):
     def event_generator():
         try:
-            for event in iter_ytdlp_events(payload.url, payload.playlist_id):
+            # URL自動判定
+            no_playlist = is_single_video_url(payload.url)
+            for event in iter_ytdlp_events(payload.url, payload.playlist_id, no_playlist):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except FileNotFoundError:
+            message = {"type": "error", "message": "yt-dlp is not installed"}
+            yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            message = {"type": "error", "message": str(exc)}
+            yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/library/import/playlist-batch")
+def import_playlist_batch(payload: PlaylistBatchImportRequest):
+    """プレイリストを並列ダウンロード"""
+    def event_generator():
+        try:
+            # URL自動判定：単体動画ならストリーム版に切り替え
+            if is_single_video_url(payload.url):
+                for event in iter_ytdlp_events(payload.url, payload.playlist_id, no_playlist=True):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            else:
+                # プレイリストなら並列ダウンロード
+                for event in batch_download_playlist(
+                    payload.url, payload.playlist_id, payload.concurrency
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except FileNotFoundError:
             message = {"type": "error", "message": "yt-dlp is not installed"}
             yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"

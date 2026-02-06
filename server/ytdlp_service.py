@@ -4,16 +4,40 @@ import json
 import re
 import subprocess
 from dataclasses import asdict
+from urllib.parse import urlparse, parse_qs
 
 from library_service import store_downloaded_tracks
 from models import Track
 from paths import MEDIA_DIR
 
 
-def download_with_ytdlp(url: str) -> tuple[list[dict], str]:
+def is_single_video_url(url: str) -> bool:
+    """URLが単体動画かプレイリストかを判定"""
+    parsed = urlparse(url)
+    
+    # YouTube判定
+    if "youtube.com" in parsed.netloc or "youtu.be" in parsed.netloc:
+        query_params = parse_qs(parsed.query)
+        # v=パラメータがあれば単体動画（--no-playlist適用）
+        if "v" in query_params:
+            return True
+        # /playlistパスまたはlist=のみならプレイリスト
+        if "/playlist" in parsed.path or "list" in query_params:
+            return False
+        return True
+    
+    # SoundCloud判定
+    if "soundcloud.com" in parsed.netloc:
+        # /sets/を含むならプレイリスト、それ以外は単体
+        return "/sets/" not in parsed.path
+    
+    # デフォルトは単体扱い
+    return True
+
+
+def download_with_ytdlp(url: str, no_playlist: bool = False) -> tuple[list[dict], str]:
     command = [
         "yt-dlp",
-        "--no-playlist",
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
@@ -22,8 +46,10 @@ def download_with_ytdlp(url: str) -> tuple[list[dict], str]:
         "mp3",
         "-o",
         str(MEDIA_DIR / "%(id)s.%(ext)s"),
-        url,
     ]
+    if no_playlist:
+        command.insert(1, "--no-playlist")
+    command.append(url)
     result = subprocess.run(
         command,
         check=False,
@@ -49,12 +75,11 @@ def download_with_ytdlp(url: str) -> tuple[list[dict], str]:
     return infos, log_output
 
 
-def build_ytdlp_command(url: str) -> list[str]:
-    return [
+def build_ytdlp_command(url: str, no_playlist: bool = False) -> list[str]:
+    command = [
         "yt-dlp",
         "--newline",
         "--progress",
-        "--no-playlist",
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
@@ -63,8 +88,11 @@ def build_ytdlp_command(url: str) -> list[str]:
         "mp3",
         "-o",
         str(MEDIA_DIR / "%(id)s.%(ext)s"),
-        url,
     ]
+    if no_playlist:
+        command.insert(1, "--no-playlist")
+    command.append(url)
+    return command
 
 
 def parse_progress(line: str) -> float | None:
@@ -77,8 +105,8 @@ def parse_progress(line: str) -> float | None:
         return None
 
 
-def iter_ytdlp_events(url: str, playlist_id: str | None = None):
-    command = build_ytdlp_command(url)
+def iter_ytdlp_events(url: str, playlist_id: str | None = None, no_playlist: bool = False):
+    command = build_ytdlp_command(url, no_playlist)
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,

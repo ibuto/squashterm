@@ -24,6 +24,7 @@ const importForm = document.getElementById("import-form");
 const importUrl = document.getElementById("import-url");
 const importAutoTag = document.getElementById("import-auto-tag");
 const importPlaylistSelect = document.getElementById("import-playlist-select");
+const playlistConcurrencyInput = document.getElementById("playlist-concurrency");
 const importSubmit = document.getElementById("import-submit");
 const importLog = document.getElementById("import-log");
 const importProgressBar = document.getElementById("import-progress-bar");
@@ -1540,24 +1541,93 @@ const streamImport = async (payload) => {
   }
 };
 
+const streamPlaylistBatchImport = async (payload) => {
+  const response = await fetch("/api/library/import/playlist-batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "プレイリストダウンロードの開始に失敗しました。");
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    chunks.forEach((chunk) => {
+      const line = chunk
+        .split("\n")
+        .find((entry) => entry.startsWith("data: "));
+      if (!line) {
+        return;
+      }
+      const data = line.replace("data: ", "").trim();
+      if (!data) {
+        return;
+      }
+      try {
+        const event = JSON.parse(data);
+        if (event.type === "log") {
+          appendImportLog(event.message, { append: true });
+        }
+        if (event.type === "progress") {
+          const total = event.total || 1;
+          const completed = event.completed || 0;
+          const failed = event.failed || 0;
+          const percentage = Math.floor((completed + failed) / total * 100);
+          updateImportProgress(percentage, `${completed}/${total} 完了 (失敗: ${failed})`);
+          appendImportLog(`進行中: ${event.message || ''}`, { append: true });
+        }
+        if (event.type === "error") {
+          updateImportProgress(0, "エラー");
+          appendImportLog(`エラー: ${event.message}`, { append: true });
+        }
+        if (event.type === "complete") {
+          const total = event.total || 0;
+          const completed = event.completed || 0;
+          const failed = event.failed || 0;
+          updateImportProgress(100, "完了");
+          appendImportLog(`完了: ${completed}件成功, ${failed}件失敗`, { append: true });
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  }
+};
+
 const handleImportSubmit = async () => {
   const url = importUrl?.value?.trim();
   if (!url) {
     appendImportLog("URL を入力してください。");
     return;
   }
+  
+  // 並列度設定を取得（デフォルト10）
+  const concurrency = parseInt(localStorage.getItem("playlistConcurrency") || "10", 10);
+  
+  // バッチダウンロードAPI（自動判定含む）
   const payload = {
     url,
+    concurrency,
   };
   payload.auto_tag = Boolean(importAutoTag?.checked);
   const playlistId = importPlaylistSelect?.value?.trim();
   if (playlistId) {
     payload.playlist_id = playlistId;
   }
-  appendImportLog("yt-dlp を実行中...", { reset: true });
+  appendImportLog("ダウンロードを開始中...", { reset: true });
   updateImportProgress(0, "開始");
   try {
-    await streamImport(payload);
+    await streamPlaylistBatchImport(payload);
     await refreshLibrary();
     importUrl.value = "";
   } catch (error) {
@@ -1707,6 +1777,22 @@ if (importForm) {
   importForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleImportSubmit();
+  });
+}
+
+if (playlistConcurrencyInput) {
+  // 初期値をlocalStorageから読み込み
+  const savedConcurrency = localStorage.getItem("playlistConcurrency");
+  if (savedConcurrency) {
+    playlistConcurrencyInput.value = savedConcurrency;
+  }
+  
+  // 変更時にlocalStorageに保存
+  playlistConcurrencyInput.addEventListener("change", () => {
+    const value = parseInt(playlistConcurrencyInput.value, 10);
+    if (value >= 1 && value <= 20) {
+      localStorage.setItem("playlistConcurrency", value.toString());
+    }
   });
 }
 

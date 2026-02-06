@@ -324,3 +324,102 @@ def update_playlist_sync_status(
         )
         latest_playlist["auto_sync_last_error"] = "\n".join(errors)
         save_library(latest_data)
+
+
+def batch_download_playlist(url: str, playlist_id: str | None, concurrency: int):
+    """プレイリストを並列ダウンロード（download_queue使用）"""
+    from download_queue import ThreadPoolDownloadQueue
+    import subprocess
+    import time
+    
+    # プレイリスト情報を取得
+    cmd = [
+        "yt-dlp",
+        "--flat-playlist",
+        "--print-json",
+        "--no-warnings",
+        url,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to fetch playlist: {result.stderr}")
+    
+    entries = []
+    for line in result.stdout.strip().split("\n"):
+        if line.strip():
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    
+    if not entries:
+        raise RuntimeError("Playlist is empty or could not be fetched")
+    
+    # 並列ダウンロードキューを作成
+    queue = ThreadPoolDownloadQueue(max_workers=concurrency)
+    
+    completed_count = 0
+    failed_count = 0
+    results = []
+    
+    def download_single(entry_url: str, entry_id: str | None):
+        """単一エントリのダウンロード"""
+        from ytdlp_service import download_with_ytdlp
+        try:
+            infos, _ = download_with_ytdlp(entry_url, no_playlist=True)
+            tracks = store_downloaded_tracks(infos, entry_url, playlist_id)
+            return {"success": True, "tracks": tracks}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def progress_callback(task, result):
+        """進捗コールバック"""
+        nonlocal completed_count, failed_count
+        if result.get("success"):
+            completed_count += 1
+            results.extend(result.get("tracks", []))
+        else:
+            failed_count += 1
+        yield {
+            "type": "progress",
+            "total": len(entries),
+            "completed": completed_count,
+            "failed": failed_count,
+            "message": f"{task.index + 1}/{task.total}: {task.title or task.entry_id}",
+        }
+    
+    # ダウンロード開始
+    task_id = queue.enqueue_playlist(
+        entries,
+        download_single,
+        playlist_id,
+        progress_callback,
+    )
+    
+    # 完了まで待機
+    while True:
+        status = queue.get_status(task_id)
+        total = status.get("total", 0)
+        completed = status.get("completed", 0)
+        failed = status.get("failed", 0)
+        
+        yield {
+            "type": "progress",
+            "total": total,
+            "completed": completed,
+            "failed": failed,
+            "message": f"Downloading {completed}/{total} (Failed: {failed})",
+        }
+        
+        if completed + failed >= total:
+            break
+        time.sleep(1)
+    
+    # 最終結果
+    yield {
+        "type": "complete",
+        "total": len(entries),
+        "completed": completed_count,
+        "failed": failed_count,
+        "tracks": [asdict(track) for track in results],
+    }
