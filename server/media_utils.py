@@ -62,13 +62,15 @@ def extract_id3_metadata(file_path: Path, format_duration) -> dict:
         "genre": None,
         "year": 0,
         "duration": "--",
+        "bitrate_kbps": None,
+        "file_format": file_path.suffix.lstrip(".").lower() or None,
     }
     mutagen_file, _ = load_mutagen()
     if not mutagen_file:
         return metadata
-    audio = mutagen_file(file_path, easy=True)
-    if audio:
-        tags = audio.tags or {}
+    audio_tags = mutagen_file(file_path, easy=True)
+    if audio_tags:
+        tags = audio_tags.tags or {}
         metadata["title"] = (tags.get("title") or [None])[0]
         metadata["artist"] = (tags.get("artist") or [None])[0]
         metadata["album"] = (tags.get("album") or [None])[0]
@@ -76,9 +78,14 @@ def extract_id3_metadata(file_path: Path, format_duration) -> dict:
         date_value = (tags.get("date") or tags.get("year") or [None])[0]
         if isinstance(date_value, str) and date_value[:4].isdigit():
             metadata["year"] = int(date_value[:4])
-        duration = getattr(audio.info, "length", None)
+    audio_info = mutagen_file(file_path)
+    if audio_info:
+        duration = getattr(audio_info.info, "length", None)
         if duration:
             metadata["duration"] = format_duration(duration)
+        bitrate = getattr(audio_info.info, "bitrate", None)
+        if bitrate:
+            metadata["bitrate_kbps"] = int(round(bitrate / 1000))
     return metadata
 
 
@@ -154,6 +161,8 @@ def scan_media_directory() -> int:
             "year": 0,
             "file_url": f"/media/{mp3_file.name}",
             "source_url": "",
+            "file_format": "mp3",
+            "bitrate_kbps": None,
             "file_path": str(mp3_file),
         }
         tracks.append(track_entry)

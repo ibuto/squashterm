@@ -222,6 +222,33 @@
                 </label>
                 <button type="button" class="secondary" id="tag-save">変更内容を保存</button>
               </form>
+              <form class="card" id="local-folder-form">
+                <h4>ローカルフォルダから追加</h4>
+                <label>
+                  <span>フォルダパス</span>
+                  <input
+                    type="text"
+                    id="local-folder-path"
+                    placeholder="/path/to/music"
+                    required
+                  />
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="local-folder-auto-tag" checked />
+                  <span>ID3タグを自動解析</span>
+                </label>
+                <label>
+                  <span>追加先プレイリスト</span>
+                  <select id="local-folder-playlist-select">
+                    <option value="">指定なし</option>
+                  </select>
+                </label>
+                <button type="submit" class="primary">フォルダを取り込む</button>
+                <div class="terminal">
+                  <p class="terminal-title">フォルダ取り込みログ</p>
+                  <pre class="terminal-output" id="local-folder-log">待機中...</pre>
+                </div>
+              </form>
               <form class="card" id="upload-form">
                 <h4>ローカルファイルを追加</h4>
                 <label>
@@ -332,6 +359,7 @@
             <h2 id="player-title">--</h2>
             <p id="player-artist">--</p>
             <p class="player-meta" id="player-album">--</p>
+            <p class="player-meta" id="player-format">--</p>
           </div>
           <div class="player-progress">
             <span id="player-current">0:00</span>

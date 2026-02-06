@@ -22,6 +22,7 @@ from library_service import (
     fetch_favorites,
     fetch_playlists,
     fetch_tracks,
+    import_local_folder,
     init_library,
     load_library,
     parse_positive_int,
@@ -31,6 +32,7 @@ from library_service import (
 from models import (
     FavoritesUpdate,
     ImportRequest,
+    LocalFolderImportRequest,
     PlaylistBatchImportRequest,
     PlaylistCreate,
     PlaylistUpdate,
@@ -301,6 +303,17 @@ def import_playlist_batch(payload: PlaylistBatchImportRequest):
             yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/library/import/local-folder")
+def import_local_folder_route(payload: LocalFolderImportRequest):
+    try:
+        tracks = import_local_folder(payload.path, payload.playlist_id, payload.auto_tag)
+        return {"added": len(tracks), "tracks": [asdict(track) for track in tracks]}
+    except FileNotFoundError:
+        raise HTTPException(status_code=400, detail="Folder not found")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/api/library/upload")

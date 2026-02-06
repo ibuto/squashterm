@@ -41,6 +41,13 @@ const uploadYearInput = document.getElementById("upload-year");
 const uploadSourceUrlInput = document.getElementById("upload-source-url");
 const uploadPlaylistSelect = document.getElementById("upload-playlist-select");
 const uploadLog = document.getElementById("upload-log");
+const localFolderForm = document.getElementById("local-folder-form");
+const localFolderPathInput = document.getElementById("local-folder-path");
+const localFolderAutoTag = document.getElementById("local-folder-auto-tag");
+const localFolderPlaylistSelect = document.getElementById(
+  "local-folder-playlist-select"
+);
+const localFolderLog = document.getElementById("local-folder-log");
 
 const statusVersion = document.getElementById("status-version");
 const statusDevice = document.getElementById("status-device");
@@ -58,6 +65,7 @@ const playerCover = document.getElementById("player-cover");
 const playerTitle = document.getElementById("player-title");
 const playerArtist = document.getElementById("player-artist");
 const playerAlbum = document.getElementById("player-album");
+const playerFormat = document.getElementById("player-format");
 const playerToggle = document.getElementById("player-toggle");
 const playerPrev = document.getElementById("player-prev");
 const playerSkipBack = document.getElementById("player-skip-back");
@@ -150,6 +158,17 @@ const formatTime = (seconds) => {
   const minutes = Math.floor(seconds / 60);
   const remainder = Math.floor(seconds % 60);
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+};
+
+const formatFileDetails = (track) => {
+  if (!track) {
+    return "--";
+  }
+  const formatLabel = track.file_format
+    ? track.file_format.toString().toUpperCase()
+    : "不明";
+  const bitrateLabel = track.bitrate_kbps ? `${track.bitrate_kbps}kbps` : "不明";
+  return `形式: ${formatLabel} ・ ${bitrateLabel}`;
 };
 
 const updatePlayerButtons = () => {
@@ -339,6 +358,9 @@ const updatePlayerUI = () => {
     if (playerAlbum) {
       playerAlbum.textContent = "--";
     }
+    if (playerFormat) {
+      playerFormat.textContent = "--";
+    }
     if (miniCover) {
       miniCover.src = "";
       miniCover.alt = "";
@@ -393,6 +415,9 @@ const updatePlayerUI = () => {
   }
   if (playerAlbum) {
     playerAlbum.textContent = track.album;
+  }
+  if (playerFormat) {
+    playerFormat.textContent = formatFileDetails(track);
   }
   if (miniCover) {
     miniCover.src = track.cover || "";
@@ -1042,7 +1067,11 @@ const renderPlaylistModalList = () => {
 };
 
 const renderPlaylistSelectOptions = () => {
-  const selects = [importPlaylistSelect, uploadPlaylistSelect].filter(Boolean);
+  const selects = [
+    importPlaylistSelect,
+    uploadPlaylistSelect,
+    localFolderPlaylistSelect,
+  ].filter(Boolean);
   selects.forEach((select) => {
     select.innerHTML = '<option value="">指定なし</option>';
     state.playlists.forEach((playlist) => {
@@ -1475,6 +1504,23 @@ const appendUploadLog = (message, options = {}) => {
   uploadLog.textContent = currentText.trimStart();
 };
 
+const appendLocalFolderLog = (message, options = {}) => {
+  if (!localFolderLog) {
+    return;
+  }
+  const { append, reset } = options;
+  const maxLength = 3000;
+  if (reset) {
+    localFolderLog.textContent = "";
+  }
+  const currentText = append ? `${localFolderLog.textContent}\n${message}` : message;
+  if (currentText.length > maxLength) {
+    localFolderLog.textContent = currentText.slice(-maxLength);
+    return;
+  }
+  localFolderLog.textContent = currentText.trimStart();
+};
+
 const updateImportProgress = (percent, message) => {
   if (!importProgressBar || !importProgressText) {
     return;
@@ -1692,6 +1738,34 @@ const handleUploadSubmit = async () => {
   }
 };
 
+const handleLocalFolderSubmit = async () => {
+  if (!localFolderPathInput) {
+    return;
+  }
+  const path = localFolderPathInput.value.trim();
+  if (!path) {
+    appendLocalFolderLog("フォルダパスを入力してください。");
+    return;
+  }
+  const payload = {
+    path,
+    auto_tag: Boolean(localFolderAutoTag?.checked),
+  };
+  const playlistId = localFolderPlaylistSelect?.value?.trim();
+  if (playlistId) {
+    payload.playlist_id = playlistId;
+  }
+  appendLocalFolderLog("フォルダを取り込み中...", { reset: true });
+  try {
+    const result = await requestJson("/api/library/import/local-folder", payload, "POST");
+    const addedCount = result?.added ?? 0;
+    appendLocalFolderLog(`取り込み完了: ${addedCount}件追加`, { append: true });
+    await refreshLibrary();
+  } catch (error) {
+    appendLocalFolderLog(`エラー: ${error.message}`, { append: true });
+  }
+};
+
 const handlePlaylistCreate = async () => {
   if (!playlistNameInput) {
     return;
@@ -1844,6 +1918,13 @@ if (uploadForm) {
   uploadForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleUploadSubmit();
+  });
+}
+
+if (localFolderForm) {
+  localFolderForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    handleLocalFolderSubmit();
   });
 }
 

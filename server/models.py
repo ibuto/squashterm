@@ -18,6 +18,8 @@ class Track:
     year: int
     file_url: str | None = None
     source_url: str | None = None
+    file_format: str | None = None
+    bitrate_kbps: int | None = None
 
 
 class ImportRequest(BaseModel):
@@ -31,6 +33,12 @@ class PlaylistBatchImportRequest(BaseModel):
     url: str
     playlist_id: str | None = None
     concurrency: int = 10
+    auto_tag: bool | None = None
+
+
+class LocalFolderImportRequest(BaseModel):
+    path: str
+    playlist_id: str | None = None
     auto_tag: bool | None = None
 
 
