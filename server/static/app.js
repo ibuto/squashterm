@@ -447,6 +447,7 @@ const closePlayerOverlay = () => {
     playerOverlay.classList.remove("is-active");
     playerOverlay.setAttribute("aria-hidden", "true");
   }
+  document.body?.classList.remove("player-overlay-open");
   closePlayerMenu();
 };
 
@@ -457,6 +458,7 @@ const openPlayerOverlay = () => {
     playerOverlay.classList.add("is-active");
     playerOverlay.setAttribute("aria-hidden", "false");
   }
+  document.body?.classList.add("player-overlay-open");
   updatePlayerUI();
   updatePlayerButtons();
   updateFavoriteButtons();
