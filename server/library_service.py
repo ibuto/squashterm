@@ -285,7 +285,18 @@ def fetch_tracks() -> list[Track]:
 
 def fetch_playlists() -> list[dict]:
     data = load_library()
-    return data.get("playlists", [])
+    playlists = data.get("playlists", [])
+    updated = False
+    for playlist in playlists:
+        if "is_public" not in playlist:
+            playlist["is_public"] = True
+            updated = True
+        if "owner_id" not in playlist:
+            playlist["owner_id"] = None
+            updated = True
+    if updated:
+        save_library(data)
+    return playlists
 
 
 def fetch_favorites() -> list[str]:

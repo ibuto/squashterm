@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 from html import escape
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import Cookie, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -35,7 +35,27 @@ from library_service import (
     remove_media_asset,
     save_library,
 )
+from auth_service import (
+    create_api_key,
+    create_session,
+    create_user,
+    delete_user,
+    get_session_user,
+    get_user_by_api_key,
+    init_auth_db,
+    list_api_keys,
+    list_users,
+    revoke_session,
+    authenticate_user,
+    get_user_by_id,
+    update_api_key,
+    update_user,
+    update_user_profile,
+)
 from models import (
+    ApiKeyCreateRequest,
+    ApiKeyUpdateRequest,
+    AuthLoginRequest,
     DownloadRequest,
     FavoritesUpdate,
     ImportRequest,
@@ -46,6 +66,8 @@ from models import (
     Track,
     TrackRegisterRequest,
     TrackUpdate,
+    UserCreateRequest,
+    UserUpdateRequest,
 )
 from paths import AUTO_SYNC_LOCK, MEDIA_DIR, STATIC_DIR, TEMPLATE_PATH
 from settings_service import (
@@ -92,11 +114,64 @@ async def lifespan(app_: "FastAPI"):  # noqa: F841
 app = FastAPI(title="SquashTerm Server", version="0.1.0", lifespan=lifespan)
 
 init_library()
+init_auth_db()
 load_settings(DEFAULT_SETTINGS)
 ensure_version_file()
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+
+
+def _extract_api_key(authorization: str | None, x_api_key: str | None) -> str | None:
+    if x_api_key:
+        return x_api_key.strip()
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return None
+
+
+def resolve_current_user(session_token: str | None, authorization: str | None, x_api_key: str | None, origin: str | None) -> dict | None:
+    user = get_session_user(session_token)
+    if user:
+        return user
+    api_key = _extract_api_key(authorization, x_api_key)
+    return get_user_by_api_key(api_key, origin)
+
+
+def require_login(user: dict | None) -> dict:
+    if not user:
+        raise HTTPException(status_code=401, detail="Login required")
+    return user
+
+
+def require_admin(user: dict | None) -> dict:
+    user = require_login(user)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin required")
+    return user
+
+
+def can_view_playlist(user: dict | None, playlist: dict) -> bool:
+    if playlist.get("is_public", True):
+        return True
+    if not user:
+        return False
+    if user.get("role") == "admin":
+        return True
+    return playlist.get("owner_id") == user.get("id")
+
+
+def can_manage_playlist(user: dict | None, playlist: dict) -> bool:
+    if not user:
+        return False
+    if user.get("role") == "admin":
+        return True
+    if playlist.get("is_public", True):
+        return False
+    owner_id = playlist.get("owner_id")
+    if owner_id is None:
+        return False
+    return owner_id == user.get("id")
 
 
 @app.get("/")
@@ -346,7 +421,15 @@ def update_design_settings(payload: dict):
 
 
 @app.post("/api/settings/design/logo")
-async def upload_logo(file: UploadFile = File(...)):
+async def upload_logo(
+    file: UploadFile = File(...),
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     if not file.filename:
         raise HTTPException(status_code=400, detail="logo file is required")
     branding_dir = MEDIA_DIR / "branding"
@@ -358,7 +441,15 @@ async def upload_logo(file: UploadFile = File(...)):
 
 
 @app.post("/api/settings/design/favicon")
-async def upload_favicon(file: UploadFile = File(...)):
+async def upload_favicon(
+    file: UploadFile = File(...),
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     if not file.filename:
         raise HTTPException(status_code=400, detail="favicon file is required")
     branding_dir = MEDIA_DIR / "branding"
@@ -369,13 +460,281 @@ async def upload_favicon(file: UploadFile = File(...)):
     return {"success": True, "favicon_url": "/favicon.ico"}
 
 
+
+
+
+
+@app.delete("/api/settings/design/logo")
+def reset_logo(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    logo_path = MEDIA_DIR / "branding" / "logo.png"
+    if logo_path.exists():
+        logo_path.unlink()
+    return {"success": True, "logo_url": "/branding/logo"}
+
+
+@app.delete("/api/settings/design/favicon")
+def reset_favicon(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    favicon_path = MEDIA_DIR / "branding" / "favicon.ico"
+    if favicon_path.exists():
+        favicon_path.unlink()
+    return {"success": True, "favicon_url": "/favicon.ico"}
+
+
+@app.get("/api/auth/me")
+def get_auth_me(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    role = user.get("role") if user else "guest"
+    return {"user": user, "role": role}
+
+
+@app.post("/api/auth/login")
+def login(payload: AuthLoginRequest, response: Response):
+    user = authenticate_user(payload.username.strip(), payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_session(user["id"])
+    response.set_cookie("session_token", token, httponly=True, samesite="lax", max_age=30*24*60*60)
+    return {"user": user, "role": user["role"]}
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response, session_token: str | None = Cookie(default=None)):
+    if session_token:
+        revoke_session(session_token)
+    response.delete_cookie("session_token")
+    return {"ok": True}
+
+
+
+
+@app.put("/api/auth/profile")
+def update_auth_profile(
+    payload: dict,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    user = require_login(user)
+    display_name = payload.get("display_name")
+    if display_name is not None:
+        display_name = str(display_name).strip()
+    updated = update_user_profile(user["id"], display_name=display_name)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
+
+@app.post("/api/auth/profile/icon")
+async def upload_auth_profile_icon(
+    file: UploadFile = File(...),
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    user = require_login(user)
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="icon file is required")
+    extension = Path(file.filename).suffix.lower() or ".png"
+    icon_dir = MEDIA_DIR / "user_icons"
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    icon_path = icon_dir / f"user_{user['id']}{extension}"
+    with icon_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    icon_url = f"/media/user_icons/{icon_path.name}"
+    updated = update_user_profile(user["id"], icon_url=icon_url)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
+
+@app.post("/api/admin/users/{user_id}/icon")
+async def upload_admin_user_icon(
+    user_id: int,
+    file: UploadFile = File(...),
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    actor = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(actor)
+    target = get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="icon file is required")
+    extension = Path(file.filename).suffix.lower() or ".png"
+    icon_dir = MEDIA_DIR / "user_icons"
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    icon_path = icon_dir / f"user_{user_id}{extension}"
+    with icon_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    icon_url = f"/media/user_icons/{icon_path.name}"
+    updated = update_user_profile(user_id, icon_url=icon_url)
+    return updated
+
+
+@app.get("/api/admin/users")
+def get_admin_users(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    users = list_users()
+    user_map = {row["id"]: row["username"] for row in users}
+    track_map = {track.id: track.title for track in fetch_tracks()}
+    playlist_map: dict[int, list[dict]] = {}
+    for playlist in fetch_playlists():
+        owner_id = playlist.get("owner_id")
+        if owner_id is None:
+            continue
+        track_items = [
+            {"id": track_id, "title": track_map.get(track_id, "(不明な楽曲)")}
+            for track_id in playlist.get("track_ids", [])
+        ]
+        playlist_map.setdefault(owner_id, []).append(
+            {
+                "id": playlist.get("id"),
+                "name": playlist.get("name"),
+                "is_public": bool(playlist.get("is_public", True)),
+                "owner_id": owner_id,
+                "owner_name": user_map.get(owner_id, "(不明なユーザー)"),
+                "tracks": track_items,
+            }
+        )
+    for row in users:
+        row["playlists"] = playlist_map.get(row["id"], [])
+    return users
+
+
+@app.post("/api/admin/users")
+def post_admin_user(
+    payload: UserCreateRequest,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    role = payload.role if payload.role in {"user", "admin"} else "user"
+    try:
+        return create_user(payload.username.strip(), payload.password, role, payload.display_name, payload.icon_url)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/api/admin/users/{user_id}")
+def put_admin_user(
+    user_id: int,
+    payload: UserUpdateRequest,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    actor = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(actor)
+    updated = update_user(user_id, payload.username, payload.password, payload.role, payload.is_active, payload.display_name, payload.icon_url)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
+
+@app.delete("/api/admin/users/{user_id}", status_code=204)
+def remove_admin_user(
+    user_id: int,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    actor = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(actor)
+    if not delete_user(user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    return Response(status_code=204)
+
+
+@app.get("/api/admin/api-keys")
+def get_admin_api_keys(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    return list_api_keys()
+
+
+@app.post("/api/admin/api-keys")
+def post_admin_api_key(
+    payload: ApiKeyCreateRequest,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    row, raw_key = create_api_key(payload.name.strip(), payload.origin.strip() if payload.origin else None, user["id"])
+    row["key"] = raw_key
+    return row
+
+
+@app.put("/api/admin/api-keys/{key_id}")
+def put_admin_api_key(
+    key_id: int,
+    payload: ApiKeyUpdateRequest,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
+    updated = update_api_key(key_id, payload.name, payload.origin, payload.is_active)
+    if not updated:
+        raise HTTPException(status_code=404, detail="API key not found")
+    return updated
+
+
 @app.get("/api/library")
 def get_library():
     return [asdict(track) for track in fetch_tracks()]
 
 
 @app.put("/api/library/{track_id}")
-def update_track(track_id: str, payload: TrackUpdate):
+def update_track(track_id: str, payload: TrackUpdate, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
     data = load_library()
     tracks = data.get("tracks", [])
     track = next((item for item in tracks if item.get("id") == track_id), None)
@@ -398,7 +757,9 @@ def update_track(track_id: str, payload: TrackUpdate):
 
 
 @app.delete("/api/library/{track_id}", status_code=204)
-def delete_track(track_id: str, delete_file: bool = True):
+def delete_track(track_id: str, delete_file: bool = True, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
     data = load_library()
     tracks = data.get("tracks", [])
     target_index = next(
@@ -421,12 +782,39 @@ def delete_track(track_id: str, delete_file: bool = True):
 
 
 @app.get("/api/playlists")
-def get_playlists():
-    return fetch_playlists()
+def get_playlists(
+    include_public: bool = Query(default=False),
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    playlists = fetch_playlists()
+    if not user:
+        return [playlist for playlist in playlists if playlist.get("is_public", True)]
+    if user.get("role") == "admin":
+        return playlists
+    own_playlists = [playlist for playlist in playlists if playlist.get("owner_id") == user.get("id")]
+    if include_public:
+        public_others = [
+            playlist for playlist in playlists
+            if playlist.get("is_public", True) and playlist.get("owner_id") != user.get("id")
+        ]
+        return own_playlists + public_others
+    return own_playlists
 
 
 @app.post("/api/playlists")
-def create_playlist(payload: PlaylistCreate):
+def create_playlist(
+    payload: PlaylistCreate,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    user = require_login(user)
     data = load_library()
     playlists = data.setdefault("playlists", [])
     auto_sync_interval = parse_positive_int(payload.auto_sync_interval_minutes)
@@ -438,6 +826,8 @@ def create_playlist(payload: PlaylistCreate):
         "id": f"pl_{uuid.uuid4().hex}",
         "name": payload.name,
         "track_ids": payload.track_ids,
+        "owner_id": user["id"],
+        "is_public": bool(payload.is_public),
         "auto_sync_url": auto_sync_url,
         "auto_sync_interval_minutes": auto_sync_interval,
         "auto_sync_enabled": auto_sync_enabled,
@@ -450,12 +840,22 @@ def create_playlist(payload: PlaylistCreate):
 
 
 @app.put("/api/playlists/{playlist_id}")
-def update_playlist(playlist_id: str, payload: PlaylistUpdate):
+def update_playlist(
+    playlist_id: str,
+    payload: PlaylistUpdate,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
     data = load_library()
     playlists = data.get("playlists", [])
     playlist = next((item for item in playlists if item.get("id") == playlist_id), None)
     if playlist is None:
         raise HTTPException(status_code=404, detail="Playlist not found")
+    if not can_manage_playlist(user, playlist):
+        raise HTTPException(status_code=403, detail="Forbidden")
     if payload.name is not None:
         playlist["name"] = payload.name
     if payload.track_ids is not None:
@@ -473,12 +873,21 @@ def update_playlist(playlist_id: str, payload: PlaylistUpdate):
         )
     if payload.auto_sync_enabled is not None:
         playlist["auto_sync_enabled"] = payload.auto_sync_enabled
+    if payload.is_public is not None:
+        playlist["is_public"] = payload.is_public
     save_library(data)
     return playlist
 
 
 @app.delete("/api/playlists/{playlist_id}", status_code=204)
-def delete_playlist(playlist_id: str):
+def delete_playlist(
+    playlist_id: str,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
     data = load_library()
     playlists = data.get("playlists", [])
     target_index = next(
@@ -487,13 +896,17 @@ def delete_playlist(playlist_id: str):
     )
     if target_index is None:
         raise HTTPException(status_code=404, detail="Playlist not found")
+    if not can_manage_playlist(user, playlists[target_index]):
+        raise HTTPException(status_code=403, detail="Forbidden")
     playlists.pop(target_index)
     save_library(data)
     return Response(status_code=204)
 
 
 @app.post("/api/playlists/{playlist_id}/sync")
-def sync_playlist(playlist_id: str):
+def sync_playlist(playlist_id: str, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     try:
         with AUTO_SYNC_LOCK:
             return sync_playlist_with_remote(playlist_id)
@@ -511,7 +924,9 @@ def get_favorites():
 
 
 @app.put("/api/favorites")
-def update_favorites(payload: FavoritesUpdate):
+def update_favorites(payload: FavoritesUpdate, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     data = load_library()
     data["favorites"] = payload.track_ids
     save_library(data)
@@ -565,7 +980,9 @@ def get_system():
 
 
 @app.post("/api/library/download")
-def download_track(payload: DownloadRequest, base_url: str | None = Query(default=None)):
+def download_track(payload: DownloadRequest, base_url: str | None = Query(default=None), session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     """URLから楽曲をダウンロードし、登録済みトラックの共有リンクを返す。"""
     try:
         tracks, _ = ingest_from_url(payload.url, payload.playlist_id)
@@ -589,7 +1006,9 @@ def download_track(payload: DownloadRequest, base_url: str | None = Query(defaul
 
 
 @app.post("/api/library/import")
-def import_track(payload: ImportRequest):
+def import_track(payload: ImportRequest, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     """URLからトラックをインポートする。"""
     try:
         tracks, log_output = ingest_from_url(payload.url, payload.playlist_id)
@@ -606,7 +1025,9 @@ def import_track(payload: ImportRequest):
 
 
 @app.post("/api/library/import/stream")
-def import_track_stream(payload: ImportRequest):
+def import_track_stream(payload: ImportRequest, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     def event_generator():
         try:
             # URL自動判定
@@ -624,7 +1045,9 @@ def import_track_stream(payload: ImportRequest):
 
 
 @app.post("/api/library/import/playlist-batch")
-def import_playlist_batch(payload: PlaylistBatchImportRequest):
+def import_playlist_batch(payload: PlaylistBatchImportRequest, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     """プレイリストを並列ダウンロード"""
     def event_generator():
         try:
@@ -649,7 +1072,9 @@ def import_playlist_batch(payload: PlaylistBatchImportRequest):
 
 
 @app.post("/api/library/import/local-folder")
-def import_local_folder_route(payload: LocalFolderImportRequest):
+def import_local_folder_route(payload: LocalFolderImportRequest, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     try:
         tracks = import_local_folder(payload.path, payload.playlist_id, payload.auto_tag)
         return {"added": len(tracks), "tracks": [asdict(track) for track in tracks]}
@@ -660,7 +1085,9 @@ def import_local_folder_route(payload: LocalFolderImportRequest):
 
 
 @app.post("/api/library/register")
-def register_track(payload: TrackRegisterRequest):
+def register_track(payload: TrackRegisterRequest, session_token: str | None = Cookie(default=None), authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None), origin: str | None = Header(default=None)):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     """既存ファイルをライブラリへ登録する。
 
     - scan_meta=true: mutagen でメタデータを読み取って登録
@@ -718,6 +1145,11 @@ def register_track(payload: TrackRegisterRequest):
 
 @app.post("/api/library/upload")
 async def upload_track(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+
     file: UploadFile = File(...),
     cover: UploadFile | None = File(None),
     title: str | None = Form(None),
@@ -729,6 +1161,8 @@ async def upload_track(
     auto_tag: str | bool | None = Form(True),
     playlist_id: str | None = Form(None),
 ):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_login(user)
     if not file.filename:
         raise HTTPException(status_code=400, detail="File is required")
     ensure_data_dirs()

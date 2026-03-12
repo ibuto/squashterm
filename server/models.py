@@ -23,6 +23,41 @@ class Track:
     video_url: str | None = None
 
 
+
+
+class AuthLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserCreateRequest(BaseModel):
+    username: str
+    password: str
+    role: str = "user"
+    display_name: str | None = None
+    icon_url: str | None = None
+
+
+class UserUpdateRequest(BaseModel):
+    username: str | None = None
+    password: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    display_name: str | None = None
+    icon_url: str | None = None
+
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str
+    origin: str | None = None
+
+
+class ApiKeyUpdateRequest(BaseModel):
+    name: str | None = None
+    origin: str | None = None
+    is_active: bool | None = None
+
+
 class ImportRequest(BaseModel):
     url: str
     playlist_id: str | None = None
@@ -56,6 +91,7 @@ class PlaylistCreate(BaseModel):
     auto_sync_url: str | None = None
     auto_sync_interval_minutes: int | None = None
     auto_sync_enabled: bool | None = None
+    is_public: bool = True
 
 
 class PlaylistUpdate(BaseModel):
@@ -64,6 +100,7 @@ class PlaylistUpdate(BaseModel):
     auto_sync_url: str | None = None
     auto_sync_interval_minutes: int | None = None
     auto_sync_enabled: bool | None = None
+    is_public: bool | None = None
 
 
 class FavoritesUpdate(BaseModel):
