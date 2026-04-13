@@ -1,9 +1,9 @@
 :root {
   color-scheme: dark;
   font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-  --theme-accent-color: #38bdf8;
-  background: #1d1d1d;
+  background: #0c0c0c;
   color: #e2e8f0;
+  --theme-accent-color: #2563eb;
 }
 
 * {
@@ -18,29 +18,29 @@ body {
 
 .app {
   min-height: 100vh;
-  padding: 24px;
-  overflow-x: hidden;
+  padding: 0;
+  overflow-x: clip;
 }
 
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  gap: 24px;
+  gap: 0;
   align-items: stretch;
-  min-height: calc(100vh - 48px);
+  min-height: 100vh;
 }
 
 .sidebar {
   background: #181818;
-  border-radius: 20px;
+  border-radius: 0;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 24px;
   position: sticky;
-  top: 24px;
+  top: 0;
   height: 100vh;
-  max-height: 100vh;
+  overflow-y: auto;
 }
 
 .brand h1 {
@@ -227,10 +227,14 @@ body {
   box-shadow: 0 12px 30px color-mix(in srgb, var(--theme-accent-color) 30%, transparent);
 }
 
+body.has-mini-player .content {
+  padding-bottom: 172px;
+}
+
 .content {
   display: grid;
   gap: 24px;
-  padding-bottom: 120px;
+  padding: 24px 24px 120px;
 }
 
 .mobile-nav-toggle {
@@ -295,7 +299,7 @@ body {
 
 .panel {
   display: none;
-  background: #0c0c0c;
+  background: transparent;
   border-radius: 0;
   padding: 0;
   box-shadow: none;
@@ -318,7 +322,33 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
+
+#media-search {
+  flex: 1;
+  min-width: 140px;
+}
+
+#media-select-toggle,
+#media-view-toggle {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* メディアパネル: panel-actions内で検索バーを上段に、ボタンを横並び */
+#panel-media .panel-actions {
   flex-wrap: wrap;
+}
+#panel-media #media-search {
+  flex-basis: 100%;
+}
+#panel-media #media-select-toggle,
+#panel-media #media-view-toggle {
+  flex: 1;
+  justify-content: center;
+  text-align: center;
 }
 
 #settings-base-url {
@@ -416,6 +446,15 @@ body {
   animation: marquee-scroll var(--scroll-duration, 6s) linear infinite;
 }
 
+/* モバイルプレイヤー: span内テキストをスクロール */
+.mobile-player-info .scroll-text {
+  display: inline-block;
+}
+
+.mobile-player-info .scroll-text.is-overflowing {
+  animation: marquee-scroll var(--scroll-duration, 8s) linear infinite;
+}
+
 .media-meta {
   display: flex;
   justify-content: space-between;
@@ -425,15 +464,21 @@ body {
 
 .media-list {
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 
 .media-list-header,
 .media-list-row {
   display: grid;
-  grid-template-columns: 24px 48px 2fr 1.5fr 80px;
+  grid-template-columns: 3ch minmax(0, 1fr) minmax(0, 28%) 7em 28px;
   align-items: center;
   gap: 12px;
+}
+
+/* 選択モード: checkbox列追加、⋯列なし */
+.media-list--selecting .media-list-header,
+.media-list--selecting .media-list-row {
+  grid-template-columns: 18px 3ch minmax(0, 1fr) minmax(0, 28%) 7em;
 }
 
 .media-list-header {
@@ -441,24 +486,27 @@ body {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  margin-bottom: 4px;
 }
 
 .media-list-row {
-  background: #222;
-  border-radius: 14px;
-  padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 6px;
+  padding: 8px 12px;
   text-align: left;
   cursor: pointer;
-  transition: border 0.2s ease, background 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .media-list-row:hover {
-  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(255, 255, 255, 0.09);
 }
 
-.media-list-row:disabled {
+.media-list-row:disabled,
+.media-list-row.is-disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -468,15 +516,71 @@ body {
   height: 40px;
   border-radius: 10px;
   object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* タイトルセル: サムネ + タイトルスタック */
+.media-list-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.media-list-title-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  gap: 2px;
 }
 
 .media-list-title {
   font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .media-list-artist {
   color: #94a3b8;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* プレイリスト アーティスト列 (標準UI独自) */
+.media-list-artist-col {
+  color: #94a3b8;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* マーキー適用時 */
+.media-list-title.sp-scrolling,
+.media-list-artist-col.sp-scrolling {
+  text-overflow: clip;
+  overflow: hidden;
+}
+
+.sp-marquee-inner {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.sp-scrolling .sp-marquee-inner {
+  animation: sp-marquee var(--sp-scroll-dur, 12s) linear infinite;
+}
+
+@keyframes sp-marquee {
+  0%,  15%  { transform: translateX(0); }
+  85%, 100% { transform: translateX(var(--sp-scroll-dist, -200px)); }
 }
 
 .media-list-duration {
@@ -485,7 +589,43 @@ body {
   font-size: 13px;
 }
 
-.media-list-status {
+.media-list-num {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #94a3b8;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.media-list-num .num-text {
+  display: block;
+}
+
+.media-list-num .num-play {
+  display: none;
+  width: 14px;
+  height: 14px;
+  fill: #e2e8f0;
+}
+
+.media-list-row:hover .media-list-num .num-text,
+.media-list-row.is-playing .media-list-num .num-text {
+  display: none;
+}
+
+.media-list-row:hover .media-list-num .num-play,
+.media-list-row.is-playing .media-list-num .num-play {
+  display: block;
+}
+
+.media-list-row.is-playing .media-list-num .num-play {
+  fill: #38bdf8;
+}
+
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -560,13 +700,108 @@ body {
   height: 16px;
 }
 
-.playlist-list,
-.favorites {
+.playlist-list {
   background: #222;
   border-radius: 18px;
   padding: 16px;
   display: grid;
   gap: 12px;
+  max-height: min(60vh, 500px);
+  overflow-y: auto;
+}
+
+.playlist-item--pinned {
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.playlist-sync-badge {
+  display: inline-block;
+  font-size: 12px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.playlist-sync-badge--active {
+  color: #60a5fa;
+}
+
+.playlist-sync-badge--error {
+  color: #fca5a5;
+}
+
+.playlist-item-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.playlist-item-dots {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(15, 23, 42, 0.4);
+  color: #94a3b8;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.playlist-item:hover .playlist-item-dots,
+.playlist-item-menu:has(.playlist-item-dropdown:not([hidden])) .playlist-item-dots,
+.playlist-item-menu:focus-within .playlist-item-dots {
+  opacity: 1;
+}
+
+.playlist-item-dots:hover {
+  background: rgba(37, 99, 235, 0.2);
+  color: #e2e8f0;
+  opacity: 1;
+}
+
+.playlist-item-dropdown {
+  position: fixed;
+  z-index: 200;
+  background: #1d1d1d;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  min-width: 140px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.playlist-item-dropdown[hidden] {
+  display: none;
+}
+
+.playlist-item-dropdown-item {
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #e2e8f0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.playlist-item-dropdown-item:hover {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.playlist-item-dropdown-item--danger {
+  color: #fca5a5;
+}
+
+.playlist-item-dropdown-item--danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.playlist-modal-sync-status {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
 }
 
 .playlist-section-title {
@@ -697,16 +932,32 @@ body {
 }
 
 .playlist-detail-header h4 {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 18px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .playlist-detail-header {
+  display: grid;
+  gap: 8px;
+}
+
+/* タイトル行: タイトル左 / 管理ボタン右 */
+.playlist-detail-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 管理ボタンを小さくコンパクトに */
+#playlist-manage-toggle {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 13px;
 }
 
 .playlist-detail-header p {
@@ -715,17 +966,31 @@ body {
   font-size: 13px;
 }
 
-.playlist-track-list {
-  display: grid;
-  gap: 10px;
+/* 管理ボタン アクティブ時 */
+#playlist-manage-toggle.is-active {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.4);
 }
 
+.playlist-track-list {
+  display: grid;
+  gap: 2px;
+}
+
+/* 通常モード: 3列（並替・削除を非表示） */
 .playlist-track-header,
 .playlist-track-row {
   display: grid;
-  grid-template-columns: 20px 24px 48px 2fr 1.5fr 80px 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 30%) 5em;
   align-items: center;
   gap: 12px;
+}
+
+/* 管理モード: 5列（並替・削除を表示） */
+.playlist-track-list--managing .playlist-track-header,
+.playlist-track-list--managing .playlist-track-row {
+  grid-template-columns: 20px minmax(0, 1fr) minmax(0, 30%) 5em 32px;
 }
 
 .playlist-track-header {
@@ -733,27 +998,40 @@ body {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  margin-bottom: 4px;
+}
+
+/* ヘッダーのタイトル列: カバー(40px)+ギャップ(12px)分オフセット */
+.playlist-track-header .col-title {
+  padding-left: 52px;
 }
 
 .playlist-track-row {
-  background: #1d1d1d;
-  border-radius: 14px;
-  padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
   text-align: left;
-  transition: border 0.2s ease, background 0.2s ease;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .playlist-track-row:hover {
-  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(255, 255, 255, 0.05);
 }
 
+/* 並替ハンドル: 管理モード時のみ表示 */
 .playlist-drag-handle {
-  display: grid;
+  display: none;
   place-items: center;
   cursor: grab;
   color: #94a3b8;
+}
+
+.playlist-track-list--managing .playlist-drag-handle {
+  display: grid;
 }
 
 .playlist-drag-handle svg {
@@ -765,16 +1043,30 @@ body {
   opacity: 0.5;
 }
 
+/* 削除ボタン: 管理モード時のみ表示 */
 .playlist-remove {
+  display: none;
   border: none;
   background: rgba(248, 113, 113, 0.15);
   color: #fca5a5;
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  display: grid;
   place-items: center;
   cursor: pointer;
+}
+
+.playlist-track-list--managing .playlist-remove {
+  display: grid;
+}
+
+/* 管理モード用プレースホルダー（ヘッダー列合わせ） */
+.col-manage-placeholder {
+  display: none;
+}
+
+.playlist-track-list--managing .col-manage-placeholder {
+  display: block;
 }
 
 .playlist-remove svg {
@@ -790,7 +1082,7 @@ body {
 .manage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
 .manage-grid .card {
@@ -800,11 +1092,134 @@ body {
 }
 
 .manage-grid .card h4 {
-  margin-bottom: -2px;
+  margin: 0 0 8px 0;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .manage-grid .card label {
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0 0 6px 0;
+  padding: 0;
+}
+
+.manage-grid .card label span {
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.manage-grid .card input[type="text"],
+.manage-grid .card input[type="url"],
+.manage-grid .card input[type="file"],
+.manage-grid .card select {
+  margin: 0;
+  padding: 10px 12px;
+  background: #1d1d1d;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.manage-grid .card .checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px 0;
+}
+
+.manage-grid .card .checkbox input {
+  margin: 0;
+}
+
+.manage-grid .card .checkbox span {
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.manage-grid .card button {
+  margin: 6px 0 0 0;
+  padding: 10px 16px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.manage-grid .card button.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.manage-grid .card button.secondary {
+  background: #333;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+}
+
+.manage-grid .card .terminal {
+  margin-top: auto;
+  padding: 12px 0 0 0;
+}
+
+.manage-grid .card .terminal-title {
+  margin: 0 0 4px 0;
+  padding: 0;
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.manage-grid .card .terminal-output {
+  margin: 0;
+  padding: 10px;
+  background: #0b1022;
+  border: 1px solid #333;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  height: 132px;
+  overflow: auto;
+}
+
+.manage-grid .card .import-progress {
+  margin: 8px 0 0 0;
+  padding: 0;
+}
+
+.manage-grid .card .import-progress .progress {
+  margin: 0 0 4px 0;
+  background: #334155;
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.manage-grid .card .import-progress .progress-bar {
+  background: #22c55e;
+  height: 100%;
+}
+
+.manage-grid .card .import-progress-text {
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.manage-grid .card .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 6px 0;
 }
 
 .manage-grid .card > :last-child {
@@ -959,23 +1374,9 @@ input[type="file"] {
   border: 1px solid #7f1d1d;
 }
 
+/* bulk-action-barは常時非表示（FABに統一） */
 .bulk-action-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: #1e293b;
-  border-top: 1px solid #334155;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.bulk-action-bar[aria-hidden="true"] {
-  display: none;
+  display: none !important;
 }
 
 #bulk-selected-count {
@@ -995,9 +1396,102 @@ input[type="file"] {
   font-size: 13px;
 }
 
+/* 選択モードFAB — 全サイズで表示 */
+.selection-fab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 110;
+  background: var(--theme-accent-color);
+  border-radius: 999px;
+  padding: 10px 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.2s ease;
+}
+
+.selection-fab[aria-hidden="true"] {
+  display: none;
+}
+
+body.has-mini-player .selection-fab {
+  bottom: calc(140px + 16px);
+}
+
+.fab-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.fab-menu-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+}
+
+.selection-menu {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  bottom: 70px;
+  right: 16px;
+  z-index: 120;
+  background: #1e293b;
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 190px;
+  overflow: hidden;
+  padding: 6px 0;
+}
+
+body.has-mini-player .selection-menu {
+  bottom: calc(140px + 70px);
+}
+
+.selection-menu[aria-hidden="true"] {
+  display: none;
+}
+
+.selection-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  padding: 12px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.selection-menu-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.selection-menu-item.danger {
+  color: #f87171;
+}
+
+.selection-menu-divider {
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  margin: 4px 0;
+}
+
 .media-list-row.is-selected {
-  background: rgba(37, 99, 235, 0.15);
-  outline: 1px solid rgba(37, 99, 235, 0.4);
+  background: rgba(37, 99, 235, 0.22);
+  border-color: rgba(37, 99, 235, 0.7);
+  outline: none;
 }
 
 .media-list-checkbox {
@@ -1078,8 +1572,7 @@ input[type="file"] {
 
 .progress-bar {
   background: #22c55e;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
 }
 
 
@@ -1247,6 +1740,7 @@ input[type="file"] {
 .player-controls-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   position: relative;
   z-index: 3;
@@ -1260,7 +1754,22 @@ input[type="file"] {
   position: relative;
   z-index: 2;
   margin-top: 4px;
-  flex: 1;
+}
+
+.player-menu {
+  position: absolute;
+  bottom: 32px;
+  right: 32px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* キューを見るボタン: アクティブ時にハイライト */
+.player-queue-btn[aria-pressed="true"] {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
 }
 
 .player-progress {
@@ -1315,8 +1824,8 @@ input[type="file"] {
 }
 
 .icon-button.is-loop {
-  background: rgba(34, 197, 94, 0.25);
-  color: #86efac;
+  background: rgba(37, 99, 235, 0.15);
+  color: #93c5fd;
 }
 
 .icon-button.is-active {
@@ -1334,10 +1843,60 @@ input[type="file"] {
   color: currentColor;
 }
 
-.player-menu {
-  position: relative;
+/* ─── docker 固有: 音量コントロール共通スタイル ─── */
+.volume-control {
   display: flex;
   align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.volume-slider {
+  width: 72px;
+  height: 4px;
+  accent-color: #93c5fd;
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  align-self: center;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #93c5fd;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -4px;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #93c5fd;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.volume-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+}
+
+.volume-slider::-moz-range-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
 }
 
 .player-menu-toggle {
@@ -1572,7 +2131,7 @@ input[type="file"] {
     "progress progress";
   align-items: center;
   gap: 16px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.55);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.4);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
@@ -1669,7 +2228,7 @@ body.has-mini-player .content {
     align-items: center;
     gap: 12px;
     padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
-    background: rgba(29, 29, 29, 0.92);
+    background: rgba(12, 12, 12, 0.92);
     backdrop-filter: blur(10px);
     transition: background-color 0.2s ease;
   }
@@ -1753,8 +2312,7 @@ body.has-mini-player .content {
   }
 
   .content {
-    padding-top: calc(64px + env(safe-area-inset-top));
-    padding-bottom: 120px;
+    padding: calc(64px + env(safe-area-inset-top)) 16px 120px;
     overflow: visible;
   }
 
@@ -1765,6 +2323,12 @@ body.has-mini-player .content {
 
   .panel-actions {
     width: 100%;
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+
+  #media-search {
+    flex: 1 1 140px;
   }
   
   .media-grid {
@@ -1775,10 +2339,9 @@ body.has-mini-player .content {
     grid-template-columns: 1fr;
   }
 
-  .playlist-list,
-  .favorites {
+  .playlist-list {
     max-height: 220px;
-    overflow: auto;
+    overflow-y: auto;
   }
 
   .mini-player {
@@ -1792,6 +2355,10 @@ body.has-mini-player .content {
       "progress";
     align-items: flex-start;
     z-index: 50;
+  }
+
+  .nav-player-button.is-hidden {
+    display: none;
   }
 
   .mini-controls {
@@ -1838,23 +2405,44 @@ body.has-mini-player .content {
     bottom: auto;
     top: calc(100% + 10px);
   }
+
+  /* メディアリスト: アーティスト列を非表示、⋯ボタン列を含む4列グリッドに */
+  .media-list-header,
+  .media-list-row {
+    gap: 6px;
+    padding: 8px;
+    font-size: 12px;
+  }
+  .media-list-row {
+    grid-template-columns: 2ch minmax(0, 1fr) 5em 28px;
+  }
+  .media-list--selecting .media-list-row {
+    grid-template-columns: 18px 2ch minmax(0, 1fr) 5em;
+  }
+  .col-artist,
+  .media-list-artist-col {
+    display: none;
+  }
+  /* ヘッダー: ⋯列なし、右余白で列位置を合わせる */
+  .media-list-header {
+    grid-template-columns: 2ch minmax(0, 1fr) 5em;
+    font-size: 11px;
+    padding: 12px 42px 12px 8px;
+  }
+  /* 選択モード: ヘッダーもcheckbox列を追加 */
+  .media-list--selecting .media-list-header {
+    grid-template-columns: 18px 2ch minmax(0, 1fr) 5em;
+    padding: 12px 8px;
+  }
 }
 
 @media (max-width: 600px) {
-  .app {
-    padding: 12px;
-  }
-
   .mobile-sticky-header {
     padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
   }
 
   .sidebar {
     width: min(280px, 90vw);
-  }
-
-  .panel {
-    padding: 18px;
   }
 
   .manage-grid,
@@ -1878,6 +2466,34 @@ body.has-mini-player .content {
     justify-content: center;
   }
 
+  /* 管理ボタン: タイトル行内なので幅固定 */
+  #playlist-manage-toggle {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  /* 同期ボタンは横並び維持 */
+  .playlist-sync-actions .primary,
+  .playlist-sync-actions .secondary {
+    width: auto;
+    flex: 1;
+  }
+
+  /* プレイリストヘッダーのタイトル: 折り返し防止 */
+  .playlist-detail-title-row h4 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* トラックリストのヘッダーテキスト: 折り返し防止 */
+  .playlist-track-header span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
 
   .player-overlay-content {
     border-radius: 0;
@@ -1887,10 +2503,32 @@ body.has-mini-player .content {
     padding: 24px;
   }
 
-  .media-list-header,
-  .media-list-row {
-    grid-template-columns: 20px 40px 1fr 0.9fr 54px;
-    gap: 6px;
+  /* タッチスクリーン: ⋯ボタンを常時表示 */
+  .track-menu-btn {
+    visibility: visible;
+  }
+
+  .media-list-cover {
+    width: 32px;
+    height: 32px;
+  }
+
+  .media-list-title {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .media-list-artist {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .media-list-duration {
+    font-size: 11px;
   }
 
   .settings-version-item {
@@ -1906,27 +2544,552 @@ body.has-mini-player .content {
     min-width: 100%;
   }
 
-  .media-list-header {
-    font-size: 11px;
-  }
-
-  .media-list-title {
-    font-size: 13px;
-  }
-
-  .media-list-artist,
-  .media-list-duration {
-    font-size: 11px;
-  }
-
   .playlist-track-header,
   .playlist-track-row {
-    grid-template-columns: 18px 20px 36px 1.4fr 1fr 60px 28px;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 25%) 4em;
+    gap: 6px;
+  }
+
+  .playlist-track-list--managing .playlist-track-header,
+  .playlist-track-list--managing .playlist-track-row {
+    grid-template-columns: 18px minmax(0, 1fr) minmax(0, 25%) 4em 28px;
+    gap: 6px;
   }
 }
 
 
+/* ===================================================================
+   Spotify専用要素 — 標準テーマでは非表示
+   (spotify-ui.css 側で再表示)
+   =================================================================== */
+
+#sp-player-bar     { display: none; }
+
+/* ===================================================================
+   Up Next パネル — 標準テーマ用スタイル
+   =================================================================== */
+.up-next-panel {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: min(320px, 100vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: #1e2232;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top-left-radius: 8px;
+  z-index: 300;
+  transform: translateX(110%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.up-next-panel[aria-hidden="false"] {
+  transform: translateX(0);
+}
+.up-next-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.up-next-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.03em;
+}
+.up-next-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+.up-next-close:hover {
+  color: #e2e8f0;
+}
+.up-next-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 0;
+}
+.up-next-section {
+  margin-bottom: 8px;
+}
+.up-next-section-label {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 16px 4px;
+}
+.up-next-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+}
+.up-next-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.up-next-cover {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.up-next-info {
+  flex: 1;
+  min-width: 0;
+}
+.up-next-track-title {
+  font-size: 13px;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.up-next-track-artist {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.up-next-remove {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+.up-next-remove:hover {
+  color: #f87171;
+}
+.up-next-empty {
+  color: #64748b;
+  font-size: 13px;
+  padding: 12px 16px;
+  font-style: italic;
+}
+
+/* キュービューボタン: アクティブ時にハイライト */
+#player-queue-view[aria-pressed="true"] {
+  color: #3b82f6;
+}
+
+
+
+/* ===================================================================
+   Spotify風モバイル専用全画面プレイヤー (mobile-player-overlay)
+   デスクトップ・ミニプレイヤーには一切干渉しない
+   =================================================================== */
+
+/* ぼかし背景レイヤー (JSでアルバムアート画像を設定) */
+.mobile-player-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) brightness(0.5);
+  transform: scale(1.15);
+  opacity: 0.6;
+}
+
+.mobile-player-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.mobile-player-overlay[aria-hidden="false"] {
+  display: flex;
+}
+
+.mobile-player-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: env(safe-area-inset-top, 16px) 44px calc(52px + env(safe-area-inset-bottom, 0px)) 44px;
+  box-sizing: border-box;
+}
+
+/* ヘッダー */
+.mobile-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.mobile-player-close {
+  color: #b3b3b3;
+  width: 40px;
+  height: 40px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-player-close:hover {
+  color: #fff;
+}
+
+.mobile-player-heading {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b3b3b3;
+}
+
+.mobile-player-header-space {
+  width: 40px;
+}
+
+/* アルバムアート — flex:1 で空きスペースを埋めて中間に配置 */
+.mobile-player-art-wrap {
+  flex: 1 1 0;
+  max-height: 54vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  min-height: 0;
+}
+
+.mobile-player-cover {
+  width: min(calc(100% - 0px), 280px);
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  background: #333;
+  flex-shrink: 0;
+}
+
+/* トラック情報 + ハート */
+.mobile-player-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-top: auto;
+  margin-bottom: 10px;
+}
+
+.mobile-player-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-player-info h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+}
+
+.mobile-player-info p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+}
+
+.mobile-player-info p.mobile-player-album {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mobile-player-info-row .is-favorite svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* シークバー */
+.mobile-player-progress {
+  flex-shrink: 0;
+  margin-bottom: 6px;
+}
+
+.mobile-player-progress input[type="range"] {
+  width: 100%;
+  margin: 0 0 4px 0;
+  height: 4px;
+  accent-color: #1db954;
+}
+
+.mobile-player-time {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* メインコントロール: shuffle prev play next loop */
+.mobile-player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
+.mobile-player-controls .icon-button {
+  width: 44px;
+  height: 44px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mobile-player-controls .icon-button:hover {
+  color: #fff;
+}
+
+.mobile-player-controls .icon-button.is-active,
+.mobile-player-controls .icon-button.is-loop {
+  color: #93c5fd;
+}
+
+.mobile-player-controls .is-primary {
+  width: 64px;
+  height: 64px;
+  background: #fff;
+  color: #000;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobile-player-controls .is-primary:hover {
+  background: #e0e0e0;
+}
+
+.mobile-player-controls .is-primary svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+/* play/pause アイコン切り替え */
+#mobile-player-toggle .icon-pause { display: none; }
+#mobile-player-toggle.is-playing .icon-play  { display: none; }
+#mobile-player-toggle.is-playing .icon-pause { display: block; }
+
+/* loop-label バッジ */
+.mobile-player-controls .loop-label {
+  font-size: 8px;
+  font-weight: 700;
+  display: block;
+  text-align: center;
+  margin-top: 1px;
+  line-height: 1;
+}
+
+/* 音量 + メニュー */
+/* mobile-player-volume: .volume-control / .volume-slider の上書き */
+.mobile-player-volume {
+  gap: 10px;
+}
+
+.mobile-player-volume .icon-button {
+  color: rgba(255, 255, 255, 0.7);
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.mobile-player-volume .icon-button:hover {
+  color: #fff;
+}
+
+.mobile-player-volume .volume-slider {
+  flex: 1;
+  width: auto;
+  accent-color: #1db954;
+}
+
+.mobile-player-volume-ios-note {
+  flex: 1;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+}
+
+/* メニューラッパー */
+.mobile-player-menu-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mobile-player-menu-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 190px;
+  background: #282828;
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.mobile-player-menu-panel.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* モバイルプレイヤーは768px以下でのみ使用 */
+@media (min-width: 769px) {
+  .mobile-player-overlay {
+    display: none !important;
+  }
+}
+
+/* ============================================================
+   曲メニューボタン (⋯) — 非Spotifyテーマ共通
+   ============================================================ */
+.track-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  border-radius: 50%;
+  cursor: pointer;
+  visibility: hidden;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.track-menu-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.track-menu-btn:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.1);
+}
+.media-list-row:hover .track-menu-btn,
+.playlist-track-row:hover .track-menu-btn,
+.track-menu-btn.is-hovered,
+.track-menu-btn.is-active {
+  visibility: visible;
+}
+.media-list--selecting .track-menu-btn {
+  display: none;
+}
+
+/* 曲コンテキストメニュー バックドロップ */
+.track-ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: none;
+}
+.track-ctx-backdrop[aria-hidden="false"] {
+  display: block;
+}
+
+/* 曲コンテキストメニュー本体 */
+.track-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  background: #1e1e2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  pointer-events: auto;
+}
+.track-context-menu[aria-hidden="true"] {
+  display: none;
+}
+.track-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  white-space: nowrap;
+}
+.track-ctx-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+.track-ctx-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.track-ctx-item.is-danger {
+  color: #f87171;
+}
+.track-ctx-item.is-danger:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+.track-ctx-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
 
 @media (min-width: 901px) {
   .app {

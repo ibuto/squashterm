@@ -15,6 +15,7 @@ from html import escape
 from fastapi import Cookie, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 import uvicorn
 
 from library_service import (
@@ -115,6 +116,22 @@ async def lifespan(app_: "FastAPI"):  # noqa: F841
 
 app = FastAPI(title="SquashTerm Server", version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(GZipMiddleware, minimum_size=512)
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    elif path.startswith("/media/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=86400")
+    elif path in ("/", "/index.html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
 init_library()
 init_auth_db()
 load_settings(DEFAULT_SETTINGS)
@@ -122,6 +139,7 @@ ensure_version_file()
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+
 
 
 def _extract_api_key(authorization: str | None, x_api_key: str | None) -> str | None:
@@ -403,8 +421,183 @@ def _build_share_html(
 
 
 
+@app.get("/share/{track_id}", response_class=HTMLResponse)
+def render_share_page(track_id: str, request: Request):
+    """OGP ランディングページ。クローラーには meta タグを返し、人間には 8 秒後にアプリへリダイレクトする。"""
+    tracks = fetch_tracks()
+    track = next((t for t in tracks if t.id == track_id), None)
+    if track is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    settings = load_settings(DEFAULT_SETTINGS)
+    configured_base = str(settings.get("app", {}).get("base_url", "")).strip().rstrip("/")
+    base_url = _resolve_base_url(request, configured_base)
+
+    relative_cover = track.cover or "/static/images/icon.png"
+    abs_cover = f"{base_url}{relative_cover}" if base_url and relative_cover.startswith("/") else relative_cover
+    canonical = f"{base_url}/share/{quote(track.id)}" if base_url else f"/share/{quote(track.id)}"
+    app_url = f"{base_url}/?id={quote(track.id)}" if base_url else f"/?id={quote(track.id)}"
+
+    t = escape(track.title or "不明")
+    artist = escape(track.artist or "不明")
+    album = escape(track.album or "不明")
+    desc = escape(f"{track.artist or '不明'} · {track.album or '不明'}")
+    img = escape(abs_cover)
+    url = escape(canonical)
+    src_url = escape(track.source_url or "")
+
+    return _build_share_html(t, artist, album, desc, img, url, app_url, src_url)
+
+
+def _resolve_base_url(request: Request, settings_base_url: str) -> str:
+    """base_url を解決する。設定値が空の場合はリクエストのプロキシヘッダーから自動検出する。
+
+    優先順位: 設定値 > X-Forwarded-Proto + Host > request.base_url
+    Cloudflare / nginx などのリバースプロキシ環境でも絶対 URL を生成できる。
+    """
+    if settings_base_url:
+        return settings_base_url
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    if proto not in ("http", "https"):
+        proto = ""
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    if proto and host:
+        return f"{proto}://{host}"
+    return str(request.base_url).rstrip("/")
+
+
+def _build_share_html(
+    title: str,
+    artist: str,
+    album: str,
+    description: str,
+    image_url: str,
+    canonical_url: str,
+    app_url: str,
+    source_url: str,
+) -> str:
+    source_link = (
+        f'<a class="src-link" href="{source_url}" target="_blank" rel="noopener noreferrer">'
+        f"元の作品を開く ↗</a>"
+        if source_url
+        else ""
+    )
+    return f"""<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} - SquashTerm</title>
+    <!-- OGP -->
+    <meta property="og:type" content="music.song" />
+    <meta property="og:site_name" content="SquashTerm" />
+    <meta property="og:title" content="{title}" />
+    <meta property="og:description" content="{description}" />
+    <meta property="og:image" content="{image_url}" />
+    <meta property="og:url" content="{canonical_url}" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{title}" />
+    <meta name="twitter:description" content="{description}" />
+    <meta name="twitter:image" content="{image_url}" />
+    <style>
+      *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+      body {{
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0f0f0f;
+        color: #e5e7eb;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 1rem;
+      }}
+      .card {{
+        background: #1a1a1a;
+        border: 1px solid #2d2d2d;
+        border-radius: 12px;
+        max-width: 420px;
+        width: 100%;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      }}
+      .cover {{
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        display: block;
+        background: #111;
+      }}
+      .info {{ padding: 1.25rem 1.25rem 0.75rem; }}
+      .info h1 {{ font-size: 1.2rem; font-weight: 700; line-height: 1.3; margin-bottom: 0.35rem; }}
+      .info p  {{ font-size: 0.9rem; color: #9ca3af; }}
+      .info p + p {{ margin-top: 0.15rem; }}
+      .actions {{ padding: 0.75rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }}
+      .btn-open {{
+        display: block; width: 100%;
+        background: #93c5fd; color: #0f172a;
+        border: none; border-radius: 8px;
+        padding: 0.7rem 1rem; font-size: 0.95rem; font-weight: 600;
+        cursor: pointer; text-align: center; text-decoration: none;
+        transition: opacity .15s;
+      }}
+      .btn-open:hover {{ opacity: .85; }}
+      .src-link {{
+        display: block; text-align: center;
+        color: #6b7280; font-size: 0.8rem;
+        text-decoration: none;
+      }}
+      .src-link:hover {{ color: #9ca3af; }}
+      .redirect-note {{
+        text-align: center; font-size: 0.78rem; color: #4b5563; padding: 0 1.25rem 1rem;
+      }}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <img class="cover" src="{image_url}" alt="カバー画像" loading="lazy" />
+      <div class="info">
+        <h1>{title}</h1>
+        <p>{artist}</p>
+        <p>{album}</p>
+      </div>
+      <div class="actions">
+        <a class="btn-open" href="{escape(app_url)}">SquashTerm で開く</a>
+        {source_link}
+      </div>
+      <p class="redirect-note" id="note"><span id="sec">8</span> 秒後に自動でアプリを開きます</p>
+    </div>
+    <script>
+      /* app_url は生 URL のまま渡す: href は escape() 済み、JS は json.dumps() でエスケープ */
+      const appUrl = {json.dumps(app_url)};
+      let t = 8;
+      const el = document.getElementById("sec");
+      const note = document.getElementById("note");
+      const iv = setInterval(() => {{
+        t--;
+        if (el) el.textContent = t;
+        if (t <= 0) {{
+          clearInterval(iv);
+          if (note) note.textContent = "アプリを開いています...";
+          window.location.replace(appUrl);
+        }}
+      }}, 1000);
+    </script>
+  </body>
+</html>"""
+
+
+
 @app.put("/api/settings/base-url")
-def update_base_url(payload: dict):
+def update_base_url(
+    payload: dict,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
     base_url = payload.get("base_url", "")
     if base_url is None:
         base_url = ""
@@ -415,7 +608,15 @@ def update_base_url(payload: dict):
 
 
 @app.put("/api/settings/design")
-def update_design_settings(payload: dict):
+def update_design_settings(
+    payload: dict,
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
     accent_color = str(payload.get("accent_color", "")).strip()
     if not accent_color:
         raise HTTPException(status_code=400, detail="accent_color is required")
@@ -431,7 +632,7 @@ async def upload_logo(
     origin: str | None = Header(default=None),
 ):
     user = resolve_current_user(session_token, authorization, x_api_key, origin)
-    require_login(user)
+    require_admin(user)
     if not file.filename:
         raise HTTPException(status_code=400, detail="logo file is required")
     branding_dir = MEDIA_DIR / "branding"
@@ -451,7 +652,7 @@ async def upload_favicon(
     origin: str | None = Header(default=None),
 ):
     user = resolve_current_user(session_token, authorization, x_api_key, origin)
-    require_login(user)
+    require_admin(user)
     if not file.filename:
         raise HTTPException(status_code=400, detail="favicon file is required")
     branding_dir = MEDIA_DIR / "branding"
@@ -965,8 +1166,15 @@ def get_settings():
 
 
 @app.post("/api/library/apply-playlist-album-names")
-def api_apply_playlist_album_names():
+def api_apply_playlist_album_names(
+    session_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    origin: str | None = Header(default=None),
+):
     """既存楽曲のうち album 未設定のものに所属プレイリスト名を遡及適用する。"""
+    user = resolve_current_user(session_token, authorization, x_api_key, origin)
+    require_admin(user)
     try:
         result = apply_playlist_album_names()
         return result
@@ -1243,7 +1451,28 @@ def apply_album_from_playlists(payload: dict | list[dict]):
 
 def run(host: str = "0.0.0.0", port: int = 8000) -> None:
     print(f"SquashTerm server running on http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+
+    try:
+        import uvloop  # noqa: F401
+        loop = "uvloop"
+    except ImportError:
+        loop = "asyncio"
+
+    try:
+        import httptools  # noqa: F401
+        http = "httptools"
+    except ImportError:
+        http = "auto"
+
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        loop=loop,
+        http=http,
+        timeout_keep_alive=65,  # Cloudflare Tunnel の keepalive と合わせる
+        access_log=False,       # アクセスログ無効化でホットパス削減
+    )
 
 
 if __name__ == "__main__":

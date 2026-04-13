@@ -1,0 +1,22 @@
+{
+  "name": "SquashTerm",
+  "short_name": "SquashTerm",
+  "description": "Web music player with yt-dlp download support",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1d1d1d",
+  "theme_color": "#1d1d1d",
+  "icons": [
+    {
+      "src": "/static/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

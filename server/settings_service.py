@@ -222,7 +222,7 @@ def get_dynamic_version(repo_root: Path) -> dict:
     git_branch = os.getenv("GIT_BRANCH")
     build_date = os.getenv("BUILD_DATE")
     
-    if git_commit and git_branch:
+    if git_commit and git_branch and git_commit != "unknown" and git_branch != "unknown":
         import fastapi
         return {
             "app": f"{git_branch}@{git_commit}",

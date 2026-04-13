@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import time
 
 from library_service import (
@@ -15,6 +15,9 @@ from library_service import (
 )
 from paths import AUTO_SYNC_LOCK, AUTO_SYNC_POLL_SECONDS
 from ytdlp_service import ingest_from_url
+
+# JST (UTC+9) timezone
+JST = timezone(timedelta(hours=9))
 
 
 def fetch_flat_playlist_entries(url: str) -> list[dict]:
@@ -68,14 +71,31 @@ def sync_playlist_with_remote(playlist_id: str) -> dict:
     if not auto_sync_url:
         raise RuntimeError("Auto sync URL is missing")
     entries = fetch_flat_playlist_entries(auto_sync_url)
-    entry_urls = []
+
+    existing_urls = collect_playlist_source_urls(playlist, data)
+
+    # SoundCloud flat extraction returns only api-v2 URLs (no title/permalink_url).
+    # Fall back to track ID comparison: library track ids use "yt_{sc_track_id}" format.
+    existing_track_ids: set[str] = set()
+    _track_map = {t["id"]: t for t in data.get("tracks", [])}
+    for tid in playlist.get("track_ids", []):
+        if tid.startswith("yt_"):
+            existing_track_ids.add(tid[3:])
+
+    missing_urls: list[str] = []
     for entry in entries:
         candidate = entry_to_source_url(entry)
         normalized = normalize_source_url(candidate)
-        if normalized:
-            entry_urls.append(normalized)
-    existing_urls = collect_playlist_source_urls(playlist, data)
-    missing_urls = [url for url in entry_urls if url not in existing_urls]
+        if normalized and normalized in existing_urls:
+            continue
+        sc_id = str(entry.get("id") or "")
+        if sc_id and sc_id in existing_track_ids:
+            continue
+        # Use api-v2 URL directly if no proper source URL was derived
+        entry_url = normalized or entry.get("url") or entry.get("webpage_url")
+        if entry_url:
+            missing_urls.append(entry_url)
+
     added_tracks = []
     errors: list[str] = []
     playlist_name = playlist.get("name")
@@ -85,7 +105,7 @@ def sync_playlist_with_remote(playlist_id: str) -> dict:
             added_tracks.extend(tracks)
         except Exception as exc:
             errors.append(f"{url}: {exc}")
-    update_playlist_sync_status(playlist_id, errors, datetime.utcnow())
+    update_playlist_sync_status(playlist_id, errors, datetime.now(JST))
     return {
         "missing_count": len(missing_urls),
         "added_count": len(added_tracks),
@@ -108,6 +128,9 @@ def should_auto_sync_playlist(playlist: dict, now: datetime) -> bool:
         return True
     try:
         last_run_time = datetime.fromisoformat(last_run)
+        # 旧バージョンで保存されたnaiveなタイムスタンプはJSTとして扱う
+        if last_run_time.tzinfo is None:
+            last_run_time = last_run_time.replace(tzinfo=JST)
     except ValueError:
         return True
     elapsed_minutes = (now - last_run_time).total_seconds() / 60
@@ -115,7 +138,7 @@ def should_auto_sync_playlist(playlist: dict, now: datetime) -> bool:
 
 
 def run_due_auto_sync() -> None:
-    now = datetime.utcnow()
+    now = datetime.now(JST)
     data = load_library()
     playlists = data.get("playlists", [])
     due_ids = [

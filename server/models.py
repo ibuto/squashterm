@@ -91,7 +91,7 @@ class PlaylistCreate(BaseModel):
     auto_sync_url: str | None = None
     auto_sync_interval_minutes: int | None = None
     auto_sync_enabled: bool | None = None
-    is_public: bool = True
+    is_public: bool = False
 
 
 class PlaylistUpdate(BaseModel):

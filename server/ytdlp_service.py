@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 from dataclasses import asdict
 from urllib.parse import parse_qs, urlparse
@@ -9,6 +10,14 @@ from urllib.parse import parse_qs, urlparse
 from library_service import store_downloaded_tracks
 from models import Track
 from paths import MEDIA_DIR
+
+# yt-dlp 2026以降はJS runtimeが必要（YouTube signature解決のため）
+# node.jsが利用可能な環境でのみ有効化し、未インストール時は空リストにフォールバック
+_YTDLP_JS_FLAGS = (
+    ["--js-runtimes", "node", "--remote-components", "ejs:github"]
+    if shutil.which("node")
+    else []
+)
 
 
 def is_single_video_url(url: str) -> bool:
@@ -63,6 +72,7 @@ def _run_ytdlp_command(command: list[str]) -> tuple[list[dict], str]:
 def build_ytdlp_command(url: str, no_playlist: bool = False) -> list[str]:
     command = [
         "yt-dlp",
+        *_YTDLP_JS_FLAGS,
         "--newline",
         "--progress",
         "--print-json",
@@ -88,6 +98,7 @@ def build_ytdlp_command(url: str, no_playlist: bool = False) -> list[str]:
 def build_audio_ytdlp_command(url: str, no_playlist: bool = False) -> list[str]:
     command = [
         "yt-dlp",
+        *_YTDLP_JS_FLAGS,
         "--print-json",
         "--write-info-json",
         "--write-thumbnail",
@@ -95,7 +106,7 @@ def build_audio_ytdlp_command(url: str, no_playlist: bool = False) -> list[str]:
         "bestaudio/best",
         "-x",
         "--audio-format",
-        "mp3",
+        "m4a",
         "-o",
         str(MEDIA_DIR / "%(id)s_audio.%(ext)s"),
     ]
@@ -128,7 +139,7 @@ def parse_progress(line: str) -> float | None:
         return None
 
 
-def iter_ytdlp_events(url: str, playlist_id: str | None = None, no_playlist: bool = False):
+def iter_ytdlp_events(url: str, playlist_id: str | None = None, no_playlist: bool = False, playlist_name: str | None = None):
     command = build_ytdlp_command(url, no_playlist)
     process = subprocess.Popen(
         command,

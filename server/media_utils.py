@@ -15,6 +15,20 @@ def load_mutagen() -> tuple[object | None, object | None]:
     return mutagen_module.File, mutagen_id3.ID3
 
 
+def convert_image_to_webp(source_data: bytes, output_path: Path, quality: int = 85) -> bool:
+    try:
+        from PIL import Image
+        import io
+        
+        image = Image.open(io.BytesIO(source_data))
+        if image.mode in ("RGBA", "LA", "P"):
+            image = image.convert("RGB")
+        image.save(output_path, "WEBP", quality=quality, method=6)
+        return True
+    except Exception:
+        return False
+
+
 def resolve_thumbnail_path(info: dict) -> str | None:
     track_id = info.get("id")
     if not track_id:
@@ -118,10 +132,13 @@ def save_cover_from_id3(file_path: Path, track_id: str) -> str | None:
         apic = id3.get(key)
         if not apic:
             continue
+        cover_path = MEDIA_DIR / f"{track_id}_cover.webp"
+        if convert_image_to_webp(apic.data, cover_path):
+            return f"/media/{cover_path.name}"
         ext = extension_from_mime(apic.mime) or ".jpg"
-        cover_path = MEDIA_DIR / f"{track_id}_cover{ext}"
-        cover_path.write_bytes(apic.data)
-        return f"/media/{cover_path.name}"
+        fallback_path = MEDIA_DIR / f"{track_id}_cover{ext}"
+        fallback_path.write_bytes(apic.data)
+        return f"/media/{fallback_path.name}"
     return None
 
 

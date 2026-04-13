@@ -4,14 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#111111" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SquashTerm" />
     <title>SquashTerm</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/static/images/icon.png" />
     <link rel="manifest" href="/static/manifest.webmanifest" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <script>
+      /* テーマ判定: localStorage を読んで CSS を1ファイルだけ同期ロード (FOUC 防止)
+         document.write は <head> 内同期スクリプトでのみ使用。
+         ブラウザはこの <link> をレンダーブロッキング扱いにするため FOUC が発生しない。 */
+      (function(){
+        var t='';try{t=localStorage.getItem('squashterm_ui_theme')||'';}catch(e){}
+        var isSp=(t==='spotify-dark'||t==='spotify-light');
+        var isLt=(t==='spotify-light');
+        window._sqTheme={spotify:isSp,light:isLt,val:t};
+        document.write('<link rel="stylesheet" href="/static/'+(isSp?'spotify-ui':'styles')+'.css">');
+      })();
+    </script>
   </head>
-  <body>
+  <body><script>
+    /* FOUC 防止: _sqTheme は head スクリプトで設定済み */
+    (function(){
+      var th=window._sqTheme||{};
+      if(th.spotify)document.body.classList.add('theme-spotify');
+      if(th.light)document.body.classList.add('theme-light');
+    })();
+  </script>
     <div class="app">
       <div class="layout">
         <aside class="sidebar" id="sidebar">
@@ -51,17 +72,18 @@
               <span class="label">Manage</span>
             </button>
             <button class="nav-button" data-tab="settings" role="tab">
-              <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="3" />
-                <path
-                  d="M4.5 12a7.5 7.5 0 0 1 .1-1.2l-2-1.5 2.2-3.8 2.4.7a7.5 7.5 0 0 1 2-1.2L11 2h2l1.8 2.1a7.5 7.5 0 0 1 2 1.2l2.4-.7 2.2 3.8-2 1.5a7.5 7.5 0 0 1 0 2.4l2 1.5-2.2 3.8-2.4-.7a7.5 7.5 0 0 1-2 1.2L13 22h-2l-1.8-2.1a7.5 7.5 0 0 1-2-1.2l-2.4.7-2.2-3.8 2-1.5c-.1-.4-.1-.8-.1-1.2z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linejoin="round"
-                />
+              <!-- Bootstrap Icons: bi-sliders -->
+              <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M11.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM9.05 3a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0V3h9.05zM4.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM2.05 8a2.5 2.5 0 0 1 4.9 0H16v1H6.95a2.5 2.5 0 0 1-4.9 0H0V8h2.05zm9.45 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-2.45 1a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0v-1h9.05z"/>
               </svg>
               <span class="label">Settings</span>
+            </button>
+<button class="nav-button nav-player-button is-hidden" id="nav-player-button" aria-label="プレイヤーを開く">
+              <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />
+                <polygon points="10,8 16,12 10,16" fill="currentColor" />
+              </svg>
+              <span class="label">Player</span>
             </button>
             <button class="nav-button" data-tab="about" role="tab" id="about-tab-button">
               <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -71,7 +93,7 @@
               </svg>
               <span class="label">About</span>
             </button>
-                      <button class="nav-button" data-tab="admin" role="tab" id="admin-tab-button" style="display:none;">
+            <button class="nav-button" data-tab="admin" role="tab" id="admin-tab-button" style="display:none;">
               <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6 6 .9-4.5 4.4 1 6.2L12 17l-5.5 2.5 1-6.2L3 8.9 9 8z"/></svg>
               <span class="label">Admin</span>
             </button>
@@ -156,6 +178,22 @@
                 <button type="button" class="secondary" id="bulk-select-cancel">キャンセル</button>
               </div>
             </div>
+            <!-- モバイル用選択モードFAB -->
+            <div class="selection-fab" id="selection-fab" aria-hidden="true">
+              <span class="fab-count" id="fab-count">0件選択中</span>
+              <button class="fab-menu-btn" id="fab-menu-btn" type="button" aria-label="選択メニューを開く">⋯</button>
+            </div>
+            <!-- FABポップアップメニュー -->
+            <div class="selection-menu" id="selection-menu" aria-hidden="true" role="menu">
+              <button type="button" class="selection-menu-item" id="fab-add-favorite" role="menuitem">お気に入りに追加</button>
+              <button type="button" class="selection-menu-item" id="fab-add-playlist" role="menuitem">プレイリストに追加</button>
+              <button type="button" class="selection-menu-item danger" id="fab-delete" role="menuitem">削除する</button>
+              <hr class="selection-menu-divider">
+              <button type="button" class="selection-menu-item" id="fab-select-all" role="menuitem">全選択</button>
+              <button type="button" class="selection-menu-item" id="fab-deselect-all" role="menuitem">全選択解除</button>
+              <hr class="selection-menu-divider">
+              <button type="button" class="selection-menu-item" id="fab-cancel" role="menuitem">キャンセル</button>
+            </div>
           </section>
 
           <section class="panel" id="panel-playlist" role="tabpanel">
@@ -170,7 +208,7 @@
             </div>
             <div class="playlist-layout">
               <div class="playlist-sidebar">
-                <form class="card playlist-create" id="playlist-create-form" aria-hidden="true">
+<form class="card playlist-create" id="playlist-create-form" aria-hidden="true">
                   <h4>新規プレイリスト</h4>
                   <label>
                     <span>プレイリスト名</span>
@@ -201,16 +239,16 @@
                   </select>
                 </label>
                 <div class="playlist-list" id="playlist-list"></div>
-                <div class="favorites" id="favorites"></div>
               </div>
               <div class="playlist-detail">
                 <div class="playlist-detail-header">
-                  <div>
+                  <div class="playlist-detail-title-row">
                     <h4 id="playlist-detail-title">プレイリストを選択</h4>
-                    <p id="playlist-detail-desc">
-                      左側のリストから表示したいプレイリストを選択してください。
-                    </p>
+                    <button type="button" class="secondary" id="playlist-manage-toggle" aria-pressed="false" hidden>管理</button>
                   </div>
+                  <p id="playlist-detail-desc">
+                    左側のリストから表示したいプレイリストを選択してください。
+                  </p>
                   <label class="search-field">
                     <span>曲検索</span>
                     <input
@@ -420,6 +458,14 @@
                 <button class="secondary" type="button" id="settings-base-url-save">ベースURLを保存</button>
               </div>
               <div class="card">
+                <h4>UIテーマ</h4>
+                <p style="font-size:13px;color:#94a3b8;margin:0 0 4px;">テーマを選択します。URL に <code>?ui=spotify-dark</code> / <code>?ui=spotify-light</code> でも切り替え可能です。</p>
+                <select id="sp-theme-select">
+                  <option value="default">デフォルト（元のスタイル）</option>
+                  <option value="spotify-dark">Spotify 風 ダーク</option>
+                  <option value="spotify-light">Spotify 風 ライト</option>
+                </select>
+              </div>
                 <h4>メンテナンス</h4>
                 <p style="margin-bottom: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">既存の楽曲のうち Album が未設定のものに、所属プレイリスト名を遡及適用します。</p>
                 <button class="secondary" type="button" id="apply-playlist-album-names">プレイリスト名をAlbumに適用</button>
@@ -486,7 +532,6 @@
               <div class="card" id="about-system-card" style="display:none;">
                 <h4>システム情報</h4>
                 <ul id="system-info-list"></ul>
-              </div>
             </div>
           </section>
         </main>
@@ -515,6 +560,90 @@
 
     <section class="player-overlay" id="player-overlay" aria-hidden="true">
       <div class="player-overlay-content">
+        <div class="player-menu">
+          <!-- キューを見るボタン: ⋯の隣に独立配置 -->
+          <button
+            class="icon-button player-queue-btn"
+            type="button"
+            id="player-queue-view"
+            aria-label="キューを見る"
+            aria-pressed="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 6h18M3 12h12M3 18h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M18 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="18" cy="19" r="2" fill="currentColor"/>
+            </svg>
+            <span class="sr-only">キューを見る</span>
+          </button>
+          <button
+            class="icon-button player-menu-toggle"
+            type="button"
+            id="player-menu-toggle"
+            aria-label="メニューを開く"
+            aria-expanded="false"
+            aria-haspopup="true"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="5" cy="12" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="19" cy="12" r="2" />
+            </svg>
+            <span class="sr-only">メニュー</span>
+          </button>
+          <div class="player-menu-panel" id="player-menu-panel" role="menu" aria-hidden="true">
+            <button type="button" role="menuitem" id="player-download" class="player-menu-action">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10" stroke="currentColor" stroke-width="2" />
+                <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" />
+                <rect x="4" y="18" width="16" height="2" rx="1" />
+              </svg>
+              <span>ダウンロード</span>
+            </button>
+            <button type="button" role="menuitem" id="player-add-playlist" class="player-menu-action">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="6" width="10" height="2" rx="1" />
+                <rect x="4" y="11" width="10" height="2" rx="1" />
+                <rect x="4" y="16" width="10" height="2" rx="1" />
+                <path d="M18 12v6" stroke="currentColor" stroke-width="2" />
+                <path d="M15 15h6" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span>プレイリストに追加</span>
+            </button>
+            <button type="button" role="menuitem" id="player-open-source" class="player-menu-action">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 7h-3a4 4 0 1 0 0 8h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M14 7h3a4 4 0 1 1 0 8h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M9 12h6" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span>ソース URLを開く</span>
+            </button>
+            <button type="button" role="menuitem" id="player-share-track" class="player-menu-action">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <path d="M8.7 10.9l6.6-3.8M8.7 13.1l6.6 3.8" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span>曲リンクを共有</span>
+            </button>
+            <button type="button" role="menuitem" id="player-edit-info" class="player-menu-action">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 17.5V20h2.5l8.9-8.9-2.5-2.5L4 17.5z" />
+                <path d="M14 6l2.5 2.5" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span>情報を編集</span>
+            </button>
+            <button type="button" role="menuitem" id="player-delete-track" class="player-menu-action is-danger">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 7h12" stroke="currentColor" stroke-width="2" />
+                <path d="M9 7V5h6v2" fill="none" stroke="currentColor" stroke-width="2" />
+                <rect x="7" y="7" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span>曲を削除する</span>
+            </button>
+          </div>
+        </div>
         <button class="player-close" type="button" id="player-close" aria-label="閉じる">
           ×
         </button>
@@ -699,22 +828,34 @@
                 <span class="sr-only">お気に入りに追加</span>
               </button>
             </div>
-            <div class="player-menu">
+            <div class="volume-control">
               <button
-                class="icon-button player-menu-toggle"
+                class="icon-button"
                 type="button"
-                id="player-menu-toggle"
-                aria-label="メニューを開く"
-                aria-expanded="false"
-                aria-haspopup="true"
+                id="player-volume-toggle"
+                aria-label="ミュート切り替え"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="5" cy="12" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="19" cy="12" r="2" />
+                  <path
+                    d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
                 </svg>
-                <span class="sr-only">メニュー</span>
+                <span class="sr-only">音量</span>
               </button>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value="100"
+                id="player-volume-slider"
+                class="volume-slider"
+                aria-label="音量調整"
+              />
               <div class="player-menu-panel" id="player-menu-panel" role="menu" aria-hidden="true">
                 <button type="button" role="menuitem" id="player-download" class="player-menu-action">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -812,6 +953,8 @@
         </div>
       </div>
     </section>
+
+
 
     <div
       class="modal-overlay"
@@ -920,6 +1063,49 @@
       </div>
     </div>
 
+    <div
+      class="modal-overlay"
+      id="playlist-edit-modal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="playlist-edit-modal-title">新規プレイリスト作成</h3>
+          <button type="button" class="icon-button" id="playlist-edit-modal-close" aria-label="閉じる">
+            ×
+          </button>
+        </div>
+        <div class="modal-body">
+          <form class="modal-form" id="playlist-edit-form">
+            <label>
+              <span>プレイリスト名</span>
+              <input type="text" id="playlist-modal-name" placeholder="プレイリスト名" required />
+            </label>
+            <label>
+              <span>同期先 URL</span>
+              <input type="url" id="playlist-modal-url" placeholder="https://www.youtube.com/playlist?list=..." />
+            </label>
+            <label>
+              <span>同期間隔（分）</span>
+              <input type="number" id="playlist-modal-interval" min="1" step="1" placeholder="60" />
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="playlist-modal-autosync" />
+              <span>自動同期を有効にする</span>
+            </label>
+            <p class="playlist-modal-sync-status" id="playlist-modal-sync-status" hidden></p>
+            <div class="modal-actions">
+              <button type="button" class="secondary" id="playlist-modal-sync" hidden>今すぐ同期する</button>
+              <button type="button" class="secondary" id="playlist-modal-cancel">キャンセル</button>
+              <button type="submit" class="primary" id="playlist-modal-submit">作成する</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <div class="mini-player" id="mini-player" aria-hidden="true">
       <div class="mini-info">
         <img class="mini-cover" id="mini-cover" src="" alt="" />
@@ -929,6 +1115,35 @@
         </div>
       </div>
       <div class="mini-controls">
+        <div class="volume-control">
+        <button
+          class="icon-button"
+          type="button"
+          id="mini-volume-toggle"
+          aria-label="ミュート切り替え"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="sr-only">音量</span>
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value="100"
+          id="mini-volume-slider"
+          class="volume-slider"
+          aria-label="音量調整"
+        />
+        </div>
         <button class="icon-button" type="button" id="mini-prev" aria-label="前へ">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="4" y="5" width="3" height="14" rx="1.5" />
@@ -1122,9 +1337,305 @@
 
     <audio id="audio-player"></audio>
 
+    <!-- Spotify 風プレイヤーバー（#sp-player-bar）: theme-spotify のときに #mini-player と入れ替わる -->
+    <div id="sp-player-bar" aria-hidden="true" role="region" aria-label="Now Playing">
+      <!-- 左: 再生中の曲情報 -->
+      <div class="sp-now-playing">
+        <img class="sp-cover" id="sp-cover" src="" alt="" />
+        <div class="sp-track-info">
+          <span class="sp-title" id="sp-title">--</span>
+          <span class="sp-artist" id="sp-artist">--</span>
+          <span class="sp-format-label" id="sp-format-label"></span>
+        </div>
+      </div>
+
+      <!-- 中央: コントロール + プログレスバー -->
+      <div class="sp-controls">
+        <div class="sp-control-btns">
+          <button class="sp-icon-btn" type="button" id="sp-shuffle" aria-label="シャッフル: オフ" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="sr-only">シャッフル</span>
+          </button>
+          <button class="sp-icon-btn" type="button" id="sp-prev" aria-label="前へ">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5" width="3" height="14" rx="1.5" />
+              <polygon points="20,5 10,12 20,19" />
+            </svg>
+            <span class="sr-only">前へ</span>
+          </button>
+          <button class="sp-icon-btn sp-play-btn" type="button" id="sp-toggle" aria-label="再生">
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
+              <polygon points="8,5 19,12 8,19" />
+            </svg>
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="7" y="5" width="4" height="14" rx="1.5" />
+              <rect x="13" y="5" width="4" height="14" rx="1.5" />
+            </svg>
+            <span class="sr-only">再生</span>
+          </button>
+          <button class="sp-icon-btn" type="button" id="sp-next" aria-label="次へ">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <polygon points="4,5 14,12 4,19" />
+              <rect x="17" y="5" width="3" height="14" rx="1.5" />
+            </svg>
+            <span class="sr-only">次へ</span>
+          </button>
+          <button class="sp-icon-btn" type="button" id="sp-loop" aria-label="ループ: オフ" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 12a6 6 0 0 1 10-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <polyline points="14,4 14,8 10,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M20 12a6 6 0 0 1-10 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <polyline points="10,20 10,16 14,16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="sp-loop-label" aria-hidden="true">OFF</span>
+            <span class="sr-only">ループ</span>
+          </button>
+        </div>
+        <div class="sp-progress">
+          <span class="sp-time" id="sp-current">0:00</span>
+          <input type="range" class="sp-seek" id="sp-seek" min="0" max="100" value="0" step="0.1" aria-label="再生位置" />
+          <span class="sp-time" id="sp-duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- 右: 音量・その他 -->
+      <div class="sp-extras">
+        <!-- 次に再生（キュー）ボタン -->
+        <button class="sp-icon-btn" type="button" id="sp-queue" aria-label="次の再生リスト" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18M3 12h12M3 18h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M18 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="18" cy="19" r="2" fill="currentColor"/>
+          </svg>
+          <span class="sr-only">次の再生リスト</span>
+        </button>
+        <!-- ❤ お気に入り -->
+        <button class="sp-icon-btn" type="button" id="sp-favorite" aria-label="お気に入りに追加" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 20.3l-1.4-1.3c-4.5-4-7.1-6.4-7.1-9.6 0-2.1 1.6-3.7 3.7-3.7 1.4 0 2.7.7 3.4 1.8.8-1.1 2-1.8 3.4-1.8 2.1 0 3.7 1.6 3.7 3.7 0 3.2-2.6 5.6-7.1 9.6L12 20.3z" />
+          </svg>
+          <span class="sr-only">お気に入り</span>
+        </button>
+        <!-- 音量 -->
+        <button class="sp-icon-btn sp-vol-btn" type="button" id="sp-volume-toggle" aria-label="ミュート切り替え">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="sr-only">音量</span>
+        </button>
+        <input type="range" class="sp-volume-slider" id="sp-volume-slider" min="0" max="100" value="100" aria-label="音量調整" />
+        <!-- 全画面（右端）-->
+        <button class="sp-icon-btn" type="button" id="sp-expand" aria-label="画面を開く">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 4H4v4M16 4h4v4M20 16v4h-4M4 16v4h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+          </svg>
+          <span class="sr-only">画面を開く</span>
+        </button>
+      </div>
+    </div>
+    <section class="mobile-player-overlay" id="mobile-player-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Now Playing">
+      <!-- ぼかし背景（アルバムアートをJSで設定） -->
+      <div class="mobile-player-bg" id="mobile-player-bg" aria-hidden="true"></div>
+      <div class="mobile-player-content">
+
+        <!-- ヘッダー: 閉じる（chevron-down）-->
+        <div class="mobile-player-header">
+          <button class="icon-button mobile-player-close" type="button" id="mobile-player-close" aria-label="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+              <polyline points="6,9 12,15 18,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <span class="mobile-player-heading">Now Playing</span>
+          <div class="mobile-player-header-space"></div>
+        </div>
+
+        <!-- アルバムアート -->
+        <div class="mobile-player-art-wrap">
+          <img class="mobile-player-cover" id="mobile-player-cover" src="" alt="" />
+        </div>
+
+        <!-- トラック情報 + ハート -->
+        <div class="mobile-player-info-row">
+          <div class="mobile-player-info">
+            <h2 id="mobile-player-title">--</h2>
+            <p id="mobile-player-artist">--</p>
+            <p class="mobile-player-album" id="mobile-player-album">--</p>
+          </div>
+          <button class="icon-button is-favorite" type="button" id="mobile-player-favorite" aria-label="お気に入りに追加" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 20.3l-1.4-1.3c-4.5-4-7.1-6.4-7.1-9.6 0-2.1 1.6-3.7 3.7-3.7 1.4 0 2.7.7 3.4 1.8.8-1.1 2-1.8 3.4-1.8 2.1 0 3.7 1.6 3.7 3.7 0 3.2-2.6 5.6-7.1 9.6L12 20.3z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- シークバー -->
+        <div class="mobile-player-progress">
+          <input type="range" min="0" max="100" value="0" step="0.1" id="mobile-player-progress-slider" aria-label="再生位置"/>
+          <div class="mobile-player-time">
+            <span id="mobile-player-current-time">0:00</span>
+            <span id="mobile-player-duration">0:00</span>
+          </div>
+        </div>
+
+        <!-- メインコントロール: シャッフル・前・再生・次・ループ -->
+        <div class="mobile-player-controls">
+          <button class="icon-button" type="button" id="mobile-player-shuffle" aria-label="シャッフル: オフ" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="icon-button" type="button" id="mobile-player-prev" aria-label="前へ">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5" width="3" height="14" rx="1.5"/>
+              <polygon points="20,5 10,12 20,19"/>
+            </svg>
+          </button>
+          <button class="icon-button is-primary" type="button" id="mobile-player-toggle" aria-label="再生">
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="8,5 19,12 8,19"/></svg>
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="6" y="4" width="4" height="16" rx="1"/>
+              <rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+          </button>
+          <button class="icon-button" type="button" id="mobile-player-next" aria-label="次へ">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="17" y="5" width="3" height="14" rx="1.5"/>
+              <polygon points="4,5 14,12 4,19"/>
+            </svg>
+          </button>
+          <button class="icon-button" type="button" id="mobile-player-loop" aria-label="ループ: オフ" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 12a6 6 0 0 1 10-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <polyline points="14,4 14,8 10,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20 12a6 6 0 0 1-10 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <polyline points="10,20 10,16 14,16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="loop-label" aria-hidden="true">OFF</span>
+          </button>
+        </div>
+
+        <!-- 音量 + メニュー -->
+        <div class="mobile-player-volume volume-control">
+          <button class="icon-button" type="button" id="mobile-player-volume-toggle" aria-label="ミュート切り替え">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <input type="range" min="0" max="100" value="100" id="mobile-player-volume-slider" class="volume-slider" aria-label="音量調整"/>
+          <p class="mobile-player-volume-ios-note" id="mobile-player-volume-ios-note" hidden></p>
+          <!-- Up Nextボタン（⋯の1つ左） -->
+          <button class="icon-button mobile-player-queue-btn" type="button" id="mobile-player-queue" aria-label="次に再生" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 6h18M3 12h12M3 18h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M18 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="18" cy="19" r="2" fill="currentColor"/>
+            </svg>
+          </button>
+          <!-- 三点リーダーメニュー -->
+          <div class="mobile-player-menu-wrapper">
+            <button class="icon-button mobile-player-menu-toggle" type="button" id="mobile-player-menu-toggle" aria-label="メニュー">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+              </svg>
+            </button>
+            <div class="mobile-player-menu-panel" id="mobile-player-menu-panel" role="menu" aria-hidden="true">
+              <button type="button" role="menuitem" id="mobile-player-play-next" class="player-menu-action">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h12M3 18h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="19" r="2" fill="currentColor"/></svg>
+                <span>次に再生する</span>
+              </button>
+              <button type="button" role="menuitem" id="mobile-player-download" class="player-menu-action">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" stroke="currentColor" stroke-width="2"/><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="4" y="18" width="16" height="2" rx="1"/></svg>
+                <span>ダウンロード</span>
+              </button>
+              <button type="button" role="menuitem" id="mobile-player-add-playlist" class="player-menu-action">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="10" height="2" rx="1"/><rect x="4" y="11" width="10" height="2" rx="1"/><rect x="4" y="16" width="10" height="2" rx="1"/><path d="M18 12v6" stroke="currentColor" stroke-width="2"/><path d="M15 15h6" stroke="currentColor" stroke-width="2"/></svg>
+                <span>プレイリストに追加</span>
+              </button>
+              <button type="button" role="menuitem" id="mobile-player-open-source" class="player-menu-action">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7h-3a4 4 0 1 0 0 8h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 7h3a4 4 0 1 1 0 8h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 12h6" stroke="currentColor" stroke-width="2"/></svg>
+                <span>ソース URLを開く</span>
+              </button>
+              <button type="button" role="menuitem" id="mobile-player-share-track" class="player-menu-action">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.9l6.6-3.8M8.7 13.1l6.6 3.8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                <span>曲リンクを共有</span>
+              </button>
+              <button type="button" role="menuitem" id="mobile-player-edit-info" class="player-menu-action">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5l8.9-8.9-2.5-2.5L4 17.5z"/><path d="M14 6l2.5 2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                <span>情報を編集</span>
+              </button>
+              <button type="button" role="menuitem" id="mobile-player-delete-track" class="player-menu-action is-danger">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12" stroke="currentColor" stroke-width="2"/><path d="M9 7V5h6v2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="7" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                <span>曲を削除する</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Up Nextパネル（body直下: z-indexがモバイルプレイヤーに干渉しないよう） -->
+    <div class="up-next-panel" id="up-next-panel" aria-hidden="true">
+      <div class="up-next-header">
+        <h3 class="up-next-title">次に再生</h3>
+        <button class="up-next-close" id="up-next-close" type="button" aria-label="閉じる">✕</button>
+      </div>
+      <div class="up-next-body" id="up-next-body"></div>
+    </div>
+    <!-- 曲コンテキストメニュー用バックドロップ（クリックで閉じる） -->
+    <div class="track-ctx-backdrop" id="track-ctx-backdrop" aria-hidden="true"></div>
+    <!-- 曲コンテキストメニュー（フローティング、単一DOM） -->
+    <div class="track-context-menu" id="track-context-menu" role="menu" aria-hidden="true">
+      <button type="button" class="track-ctx-item" data-action="play-next" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h12M3 18h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="19" r="2" fill="currentColor"/></svg>
+        次に再生する
+      </button>
+      <button type="button" class="track-ctx-item" data-action="favorite" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.4-1.3c-4.5-4-7.1-6.4-7.1-9.6 0-2.1 1.6-3.7 3.7-3.7 1.4 0 2.7.7 3.4 1.8.8-1.1 2-1.8 3.4-1.8 2.1 0 3.7 1.6 3.7 3.7 0 3.2-2.6 5.6-7.1 9.6L12 20.3z"/></svg>
+        <span>お気に入りに追加</span>
+      </button>
+      <button type="button" class="track-ctx-item" data-action="add-playlist" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="10" height="2" rx="1"/><rect x="4" y="11" width="10" height="2" rx="1"/><rect x="4" y="16" width="10" height="2" rx="1"/><path d="M18 12v6" stroke="currentColor" stroke-width="2"/><path d="M15 15h6" stroke="currentColor" stroke-width="2"/></svg>
+        プレイリストに追加
+      </button>
+      <hr class="track-ctx-divider" />
+      <button type="button" class="track-ctx-item is-danger" data-action="delete" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12" stroke="currentColor" stroke-width="2"/><path d="M9 7V5h6v2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="7" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        削除する
+      </button>
+    </div>
+
     <script src="/static/app.js"></script>
     <script>
+      /* テーマ別 JS 管理:
+         - Spotify モード: spotify-ui.js がセレクターも含めて管理 (非同期ロード)
+         - Default モード: インラインでセレクターを単純リロード方式で管理 */
+      (function(){
+        var THEME_KEY='squashterm_ui_theme';
+        if(window._sqTheme&&window._sqTheme.spotify){
+          var s=document.createElement('script');
+          s.src='/static/spotify-ui.js';
+          document.body.appendChild(s);
+        } else {
+          var sel=document.getElementById('sp-theme-select');
+          if(sel){
+            sel.value=localStorage.getItem(THEME_KEY)||'default';
+            sel.addEventListener('change',function(){
+              localStorage.setItem(THEME_KEY,sel.value);
+              location.reload();
+            });
+          }
+        }
+      })();
+    </script>
+    <script>
       if ("serviceWorker" in navigator) {
+        // 既存の SW を即座に強制更新（古い v1 キャッシュ＋main.js 問題を解消）
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (reg) { reg.update(); });
+        });
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
             console.warn("Service Worker registration failed:", error);
